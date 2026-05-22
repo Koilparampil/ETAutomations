@@ -46,7 +46,7 @@ BASE_URL  = (
 )
 TOKEN_URL   = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
 MINOR_VER   = 73
-QBO_WEB     = "https://app.qbo.intuit.com"
+QBO_WEB     = "https://qbo.intuit.com"
 SESSION_DIR = Path(".qbo_browser_session")
 
 
@@ -83,12 +83,18 @@ def get_invoice_by_number(token: str, doc_number: str) -> dict | None:
 
 
 # ── Browser helpers ────────────────────────────────────────────────────────────
+def _is_on_auth_page(page) -> bool:
+    return any(h in page.url for h in ("accounts.intuit.com", "login.intuit.com", "/login"))
+
+
 def _wait_for_qbo_app(page, timeout: int = 180_000):
     """Block until QBO app shell loads (not login/auth pages)."""
-    if "accounts.intuit.com" in page.url or "/login" in page.url:
+    if _is_on_auth_page(page):
         print("\n[browser] Please log in to QuickBooks in the browser window.")
         print("[browser] Waiting up to 3 minutes…")
-        page.wait_for_url(f"{QBO_WEB}/**", timeout=timeout)
+        # "**/app/**" matches any URL that has /app/ in the path,
+        # e.g. https://qbo.intuit.com/app/homepage
+        page.wait_for_url("**/app/**", timeout=timeout)
         page.wait_for_load_state("networkidle", timeout=30_000)
         print("[browser] Logged in — continuing.\n")
 
@@ -145,7 +151,7 @@ def process_invoice(page, invoice_id: str, doc_number: str, eta_date: str):
     _wait_for_qbo_app(page)
     page.wait_for_load_state("networkidle", timeout=30_000)
 
-    if "accounts.intuit.com" in page.url:
+    if _is_on_auth_page(page):
         raise RuntimeError(
             "Session expired. Delete .qbo_browser_session/ and re-run to log in again."
         )
