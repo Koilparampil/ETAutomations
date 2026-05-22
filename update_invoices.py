@@ -92,11 +92,12 @@ def get_custom_field_definition_id(token: str, field_name: str) -> str:
 
     Strategy:
       1. Check QB_ETA_DEFINITION_ID (or QB_<FIELDNAME>_DEFINITION_ID) in .env —
-         fastest path; set this to "4" if the field is named "udcf_4" in QBO.
+         fastest path; use the long numeric ID from Chrome DevTools, e.g.
+         "20000000000000150677" (the part after the last colon in the definition id).
       2. Scan the 50 most recently updated invoices for one that has the field
          set, and read the DefinitionId from that response.
     """
-    # 1. Env-var override — e.g. QB_ETA_DEFINITION_ID=4
+    # 1. Env-var override — e.g. QB_ETA_DEFINITION_ID=20000000000000150677
     env_key = f"QB_{field_name.upper().replace(' ', '_')}_DEFINITION_ID"
     override = os.getenv(env_key)
     if override:
@@ -125,10 +126,10 @@ def get_custom_field_definition_id(token: str, field_name: str) -> str:
 
     raise ValueError(
         f"Could not resolve DefinitionId for custom field '{field_name}'.\n"
-        f"  Option A (quickest): add  {env_key}=4  to your .env file.\n"
-        f"            The number comes from QBO's internal name for the field\n"
-        f"            (e.g. 'udcf_4' → 4). Check Chrome DevTools → Network\n"
-        f"            on any invoice page to confirm.\n"
+        f"  Option A (quickest): add  {env_key}=20000000000000150677  to your .env file.\n"
+        f"            Get the exact number from Chrome DevTools → Network → any invoice\n"
+        f"            request → find the ETA definition object → copy the long numeric\n"
+        f"            part at the end of its 'id' field (after the last colon).\n"
         f"  Option B: open one invoice in QBO that already has '{field_name}'\n"
         f"            filled in, then re-run — the script will detect it automatically."
     )
@@ -139,6 +140,8 @@ def update_invoice_eta(token: str, invoice: dict, date_val: str, definition_id: 
     Sparse-update only the ETA custom field on the invoice.
     Returns the updated invoice entity from QBO.
     """
+    # ETA is a UDCF with schema type "string" + format "date" in QBO's internals,
+    # so the REST API expects StringType/StringValue, not DateType/DateVal.
     payload = {
         "Id":        invoice["Id"],
         "SyncToken": invoice["SyncToken"],
@@ -147,8 +150,8 @@ def update_invoice_eta(token: str, invoice: dict, date_val: str, definition_id: 
             {
                 "DefinitionId": definition_id,
                 "Name":         CUSTOM_FIELD_NAME,
-                "Type":         "DateType",
-                "DateVal":      date_val,
+                "Type":         "StringType",
+                "StringValue":  date_val,
             }
         ],
     }
