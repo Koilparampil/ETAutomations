@@ -90,6 +90,11 @@ def get_custom_field_definition_id(token: str, field_name: str) -> str:
     QBO omits custom fields from invoice responses when they have no value,
     so we cannot rely on reading the DefinitionId from the invoice itself.
     The Preferences endpoint always lists every defined custom field.
+
+    QBO uses two naming levels per entry:
+      - Top-level Name: internal key, e.g. "sales1" or "udcf_4"
+      - Inner CustomField array: contains {"Name": "Name", "StringValue": "<display title>"}
+    We match against the display title so callers use the label seen in the UI.
     """
     resp = requests.get(
         f"{BASE_URL}/v3/company/{REALM_ID}/preferences",
@@ -100,15 +105,25 @@ def get_custom_field_definition_id(token: str, field_name: str) -> str:
     resp.raise_for_status()
     prefs = resp.json().get("Preferences", {})
 
-    # Custom field definitions live under SalesFormsPrefs.CustomField
     sales_prefs = prefs.get("SalesFormsPrefs", {})
     for cf in sales_prefs.get("CustomField", []):
+        # 1. Flat match — some QBO versions put the display name at the top level
         if cf.get("Name") == field_name:
             return str(cf["DefinitionId"])
 
+        # 2. Nested match — display name is inside the inner CustomField list
+        #    e.g. {"Name": "Name", "StringValue": "ETA", "Type": "StringType"}
+        for inner in cf.get("CustomField", []):
+            if inner.get("Name") == "Name" and inner.get("StringValue") == field_name:
+                return str(cf["DefinitionId"])
+
+    # Neither strategy matched — print the raw structure to help diagnose
+    import json
+    print("[debug] SalesFormsPrefs.CustomField raw content:")
+    print(json.dumps(sales_prefs.get("CustomField", []), indent=2))
     raise ValueError(
         f"Custom field '{field_name}' not found in company Preferences. "
-        "Verify the field name matches QuickBooks exactly (case-sensitive)."
+        "Check the debug output above for the actual field names / structure."
     )
 
 
