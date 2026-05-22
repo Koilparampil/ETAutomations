@@ -83,32 +83,47 @@ def get_invoice_by_number(token: str, doc_number: str) -> dict | None:
     return invoices[0] if invoices else None
 
 
-def _find_custom_field(invoice: dict, name: str) -> dict | None:
-    for cf in invoice.get("CustomField", []):
-        if cf.get("Name") == name:
-            return cf
-    return None
+def get_custom_field_definition_id(token: str, field_name: str) -> str:
+    """
+    Fetch the DefinitionId for a named custom field from company Preferences.
+
+    QBO omits custom fields from invoice responses when they have no value,
+    so we cannot rely on reading the DefinitionId from the invoice itself.
+    The Preferences endpoint always lists every defined custom field.
+    """
+    resp = requests.get(
+        f"{BASE_URL}/v3/company/{REALM_ID}/preferences",
+        params={"minorversion": MINOR_VER},
+        headers=_json_headers(token),
+        timeout=15,
+    )
+    resp.raise_for_status()
+    prefs = resp.json().get("Preferences", {})
+
+    # Custom field definitions live under SalesFormsPrefs.CustomField
+    sales_prefs = prefs.get("SalesFormsPrefs", {})
+    for cf in sales_prefs.get("CustomField", []):
+        if cf.get("Name") == field_name:
+            return str(cf["DefinitionId"])
+
+    raise ValueError(
+        f"Custom field '{field_name}' not found in company Preferences. "
+        "Verify the field name matches QuickBooks exactly (case-sensitive)."
+    )
 
 
-def update_invoice_eta(token: str, invoice: dict, date_val: str) -> dict:
+def update_invoice_eta(token: str, invoice: dict, date_val: str, definition_id: str) -> dict:
     """
     Sparse-update only the ETA custom field on the invoice.
     Returns the updated invoice entity from QBO.
     """
-    eta_field = _find_custom_field(invoice, CUSTOM_FIELD_NAME)
-    if eta_field is None:
-        raise ValueError(
-            f"Invoice {invoice['DocNumber']} has no '{CUSTOM_FIELD_NAME}' "
-            "custom field. Verify the field name matches QuickBooks exactly."
-        )
-
     payload = {
         "Id":        invoice["Id"],
         "SyncToken": invoice["SyncToken"],
         "sparse":    True,
         "CustomField": [
             {
-                "DefinitionId": eta_field["DefinitionId"],
+                "DefinitionId": definition_id,
                 "Name":         CUSTOM_FIELD_NAME,
                 "Type":         "DateType",
                 "DateVal":      date_val,
@@ -176,7 +191,12 @@ def main() -> None:
             print("  Invalid format – please use YYYY-MM-DD.")
 
     token = get_access_token()
-    print(f"\nProcessing {len(invoice_numbers)} invoice(s) with ETA={eta_date}…\n")
+
+    # Resolve the ETA DefinitionId once — QBO omits blank custom fields from
+    # invoice responses, so we can't rely on reading it per-invoice.
+    eta_definition_id = get_custom_field_definition_id(token, CUSTOM_FIELD_NAME)
+    print(f"\nResolved '{CUSTOM_FIELD_NAME}' → DefinitionId={eta_definition_id}")
+    print(f"Processing {len(invoice_numbers)} invoice(s) with ETA={eta_date}…\n")
 
     ok = failed = 0
     for num in invoice_numbers:
@@ -193,7 +213,7 @@ def main() -> None:
                 failed += 1
                 continue
 
-            updated = update_invoice_eta(token, invoice, eta_date)
+            updated = update_invoice_eta(token, invoice, eta_date, eta_definition_id)
             send_invoice(token, updated["Id"], send_to)
             print(f"  [OK]    #{num} → ETA set to {eta_date}, sent to {send_to}")
             ok += 1
