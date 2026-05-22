@@ -85,45 +85,52 @@ def get_invoice_by_number(token: str, doc_number: str) -> dict | None:
 
 def get_custom_field_definition_id(token: str, field_name: str) -> str:
     """
-    Fetch the DefinitionId for a named custom field from company Preferences.
+    Resolve the DefinitionId for a named custom field.
 
-    QBO omits custom fields from invoice responses when they have no value,
-    so we cannot rely on reading the DefinitionId from the invoice itself.
-    The Preferences endpoint always lists every defined custom field.
+    QBO's Preferences endpoint only exposes the 3 legacy SalesCustom fields.
+    Newer User Defined Custom Fields (UDCFs) like "ETA" are not listed there.
 
-    QBO uses two naming levels per entry:
-      - Top-level Name: internal key, e.g. "sales1" or "udcf_4"
-      - Inner CustomField array: contains {"Name": "Name", "StringValue": "<display title>"}
-    We match against the display title so callers use the label seen in the UI.
+    Strategy:
+      1. Check QB_ETA_DEFINITION_ID (or QB_<FIELDNAME>_DEFINITION_ID) in .env —
+         fastest path; set this to "4" if the field is named "udcf_4" in QBO.
+      2. Scan the 50 most recently updated invoices for one that has the field
+         set, and read the DefinitionId from that response.
     """
+    # 1. Env-var override — e.g. QB_ETA_DEFINITION_ID=4
+    env_key = f"QB_{field_name.upper().replace(' ', '_')}_DEFINITION_ID"
+    override = os.getenv(env_key)
+    if override:
+        print(f"[info] Using {env_key}={override} from .env")
+        return override
+
+    # 2. Scan recent invoices for one that has the field populated
     resp = requests.get(
-        f"{BASE_URL}/v3/company/{REALM_ID}/preferences",
-        params={"minorversion": MINOR_VER},
+        f"{BASE_URL}/v3/company/{REALM_ID}/query",
+        params={
+            "query":        "SELECT * FROM Invoice ORDERBY MetaData.LastUpdatedTime DESC MAXRESULTS 50",
+            "minorversion": MINOR_VER,
+        },
         headers=_json_headers(token),
         timeout=15,
     )
     resp.raise_for_status()
-    prefs = resp.json().get("Preferences", {})
+    invoices = resp.json().get("QueryResponse", {}).get("Invoice", [])
 
-    sales_prefs = prefs.get("SalesFormsPrefs", {})
-    for cf in sales_prefs.get("CustomField", []):
-        # 1. Flat match — some QBO versions put the display name at the top level
-        if cf.get("Name") == field_name:
-            return str(cf["DefinitionId"])
+    for invoice in invoices:
+        for cf in invoice.get("CustomField", []):
+            if cf.get("Name") == field_name:
+                definition_id = str(cf["DefinitionId"])
+                print(f"[info] Found '{field_name}' on invoice #{invoice['DocNumber']} → DefinitionId={definition_id}")
+                return definition_id
 
-        # 2. Nested match — display name is inside the inner CustomField list
-        #    e.g. {"Name": "Name", "StringValue": "ETA", "Type": "StringType"}
-        for inner in cf.get("CustomField", []):
-            if inner.get("Name") == "Name" and inner.get("StringValue") == field_name:
-                return str(cf["DefinitionId"])
-
-    # Neither strategy matched — print the raw structure to help diagnose
-    import json
-    print("[debug] SalesFormsPrefs.CustomField raw content:")
-    print(json.dumps(sales_prefs.get("CustomField", []), indent=2))
     raise ValueError(
-        f"Custom field '{field_name}' not found in company Preferences. "
-        "Check the debug output above for the actual field names / structure."
+        f"Could not resolve DefinitionId for custom field '{field_name}'.\n"
+        f"  Option A (quickest): add  {env_key}=4  to your .env file.\n"
+        f"            The number comes from QBO's internal name for the field\n"
+        f"            (e.g. 'udcf_4' → 4). Check Chrome DevTools → Network\n"
+        f"            on any invoice page to confirm.\n"
+        f"  Option B: open one invoice in QBO that already has '{field_name}'\n"
+        f"            filled in, then re-run — the script will detect it automatically."
     )
 
 
