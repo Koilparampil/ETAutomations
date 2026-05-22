@@ -95,7 +95,7 @@ def _wait_for_qbo_app(page, timeout: int = 180_000):
         # "**/app/**" matches any URL that has /app/ in the path,
         # e.g. https://qbo.intuit.com/app/homepage
         page.wait_for_url("**/app/**", timeout=timeout)
-        page.wait_for_load_state("networkidle", timeout=30_000)
+        page.wait_for_load_state("load", timeout=15_000)
         print("[browser] Logged in — continuing.\n")
 
 
@@ -147,16 +147,16 @@ def process_invoice(page, invoice_id: str, doc_number: str, eta_date: str):
     qbo_date = f"{dt.month}/{dt.day}/{dt.year}"
 
     # ── 1. Open the invoice edit page ─────────────────────────────────────────
-    page.goto(f"{QBO_WEB}/app/invoice?txnId={invoice_id}", wait_until="domcontentloaded")
-    _wait_for_qbo_app(page)
-    page.wait_for_load_state("networkidle", timeout=30_000)
+    page.goto(f"{QBO_WEB}/app/invoice?txnId={invoice_id}", wait_until="load")
 
     if _is_on_auth_page(page):
         raise RuntimeError(
             "Session expired. Delete .qbo_browser_session/ and re-run to log in again."
         )
 
-    # ── 2. Update ETA field ───────────────────────────────────────────────────
+    # ── 2. Wait for invoice form then update ETA ──────────────────────────────
+    # Use element visibility as the "page ready" signal — QBO's SPA never
+    # reaches networkidle because it continuously makes background requests.
     eta_input = _find_input_by_label(page, "ETA")
     eta_input.triple_click()           # select existing value
     eta_input.fill(qbo_date)
@@ -165,12 +165,14 @@ def process_invoice(page, invoice_id: str, doc_number: str, eta_date: str):
 
     # ── 3. Save the invoice ───────────────────────────────────────────────────
     _click_button(page, "Save", "Save and close")
-    page.wait_for_load_state("networkidle", timeout=30_000)
+    page.wait_for_load_state("load", timeout=15_000)
+    page.wait_for_timeout(1_500)   # let QBO finish its post-save XHRs
     print(f"    Saved  — ETA={eta_date}")
 
     # ── 4. Open send dialog ───────────────────────────────────────────────────
     _click_button(page, "Review and send", "Send")
-    page.wait_for_load_state("networkidle", timeout=20_000)
+    page.wait_for_load_state("load", timeout=15_000)
+    page.wait_for_timeout(800)
 
     # ── 5. Update email subject ───────────────────────────────────────────────
     try:
@@ -184,7 +186,8 @@ def process_invoice(page, invoice_id: str, doc_number: str, eta_date: str):
 
     # ── 6. Confirm send ───────────────────────────────────────────────────────
     _click_button(page, "Send email", "Send")
-    page.wait_for_load_state("networkidle", timeout=20_000)
+    page.wait_for_load_state("load", timeout=15_000)
+    page.wait_for_timeout(800)
     print(f"    Email sent.")
 
 
@@ -248,7 +251,7 @@ def main():
         page = context.new_page()
 
         # Trigger login check
-        page.goto(QBO_WEB, wait_until="domcontentloaded")
+        page.goto(QBO_WEB, wait_until="load")
         _wait_for_qbo_app(page)
 
         ok = failed = 0
