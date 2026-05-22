@@ -163,7 +163,9 @@ def update_invoice_eta(token: str, invoice: dict, date_val: str, definition_id: 
         timeout=15,
     )
     resp.raise_for_status()
-    return resp.json()["Invoice"]
+    result = resp.json()["Invoice"]
+    print(f"    [debug] CustomField in response: {result.get('CustomField', [])}")
+    return result
 
 
 def send_invoice(token: str, invoice_id: str, send_to: str) -> None:
