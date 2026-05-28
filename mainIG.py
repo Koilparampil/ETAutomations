@@ -28,7 +28,9 @@ from playwright.sync_api import sync_playwright
 
 from QBTings.apiREST import get_access_token, get_invoice_by_number
 from QBTings.playWrightQB import _wait_for_qbo_app
-from QBTings.invoiceProcessing import process_invoice
+from QBTings.invoiceProcessing import process_future_invoice, process_invoice
+from VShip.customerLookUp import lookup_customer_notif
+from carrierTing.carriers import carrierIDthenETAcheck
 from tinkyWinky import get_user_inputs
 
 load_dotenv()
@@ -37,6 +39,11 @@ QBO_WEB     = "https://qbo.intuit.com"
 HEADLESS  = os.getenv("QB_HEADLESS", "false").lower() == "true"
 SESSION_DIR = Path(".qbo_browser_session")
 
+# ── Helper Functions ─────────────────────────────────────────────────────────────────
+def write2File(booking):
+    with open("Send2Ben.txt", "a") as f:
+        f.write(f"{booking}\n")
+        f.close()
 def pause_before_exit():
     try:
         input("\nPress ENTER to close this window...")
@@ -50,7 +57,9 @@ def get_data(filename):
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
+    ###Get File and User Creds from User.
     inputs = get_user_inputs()
+    # Extracting invoice numbers from file
     try:
         print("Extracting data from file...")
         invoice_numbers = get_data(inputs.filename) 
@@ -58,41 +67,12 @@ def main():
         print(f"Failed to extract data from file: {e}")
         pause_before_exit()
         sys.exit(1)
-
     if not invoice_numbers:
         sys.exit("Invoice list is empty — nothing to do.")
-
-    # while True:
-    #     raw = input("Enter ETA date (YYYY-MM-DD): ").strip()
-    #     try:
-    #         datetime.strptime(raw, "%Y-%m-%d")
-    #         eta_date = raw
-    #         break
-    #     except ValueError:
-    #         print("  Invalid format — please use YYYY-MM-DD.")
-
-    # Resolve invoice IDs via REST API before opening browser
     token = get_access_token()
-    print(f"\nLooking up {len(invoice_numbers)} invoice(s) via REST API…")
-    invoices = {}
-    for num in invoice_numbers:
-        inv = get_invoice_by_number(token, num)
-        if inv is None:
-            print(f"  [SKIP] #{num} — not found in QuickBooks")
-        else:
-            invoices[num] = inv
-            print(f"  [FOUND] #{num} — QBO Id={inv['Id']}")
-
-    if not invoices:
-        sys.exit("\nNo invoices found — nothing to process.")
-
+    ok = failed = 0
     SESSION_DIR.mkdir(exist_ok=True)
     is_first_run = not any(SESSION_DIR.iterdir())
-
-    print(f"\nOpening browser ({'headless' if HEADLESS and not is_first_run else 'headed'})…")
-    if is_first_run:
-        print("[browser] First run detected — browser will open visibly for login.")
-
     with sync_playwright() as pw:
         context = pw.chromium.launch_persistent_context(
             str(SESSION_DIR),
@@ -102,33 +82,61 @@ def main():
             args=["--start-maximized"],
         )
         page = context.new_page()
-
         # Trigger login check
         page.goto(QBO_WEB, wait_until="load")
         _wait_for_qbo_app(page)
-
-        ok = failed = 0
-
-
-        for num, inv in invoices.items():
-            print(f"  #{num}")
-            try:
-                process_invoice(page, inv["Id"], num)
-                print(f"  [OK]    #{num}\n")
-                ok += 1
-            except Exception as exc:
-                print(f"  [ERROR] #{num} — {exc}\n")
-                failed += 1
-                # Screenshot for debugging
-                shot_path = f"error_{num}.png"
-                try:
-                    page.screenshot(path=shot_path)
-                    print(f"           Screenshot saved to {shot_path}")
-                except Exception:
-                    pass
-
+        for bookingNum in invoice_numbers:
+            print(f"Processing booking number: {bookingNum}")
+            if bookingNum[-1].lower() in ["0","1","2","3","4","5","6","7","8","9"]:
+                inWindow, eta = carrierIDthenETAcheck(bookingNum)
+                if inWindow and (eta is not None):
+                    try:
+                        notif_num = lookup_customer_notif(bookingNum)
+                    except Exception as e:
+                        print(f"Error occurred while looking up customer notification for {bookingNum}: {e}")
+                        notif_num = False
+                    if notif_num == 2:
+                        print(f"Booking {bookingNum} has both Notif #1 and Notif #2. Skipping invoice update and sending to Ben.")
+                        write2File(bookingNum)
+                        continue
+                    else:
+                        inv = get_invoice_by_number(token, bookingNum)
+                        if inv is not None:
+                            try:
+                                process_invoice(page, eta, inv['Id'], notif_num)
+                                
+                                print(f"  [OK]    #{bookingNum}\n")
+                                ok += 1
+                            except Exception as exc:
+                                print(f"  [ERROR] #{bookingNum} — {exc}\n")
+                                failed += 1
+                        else:
+                            print(f"  [SKIP] #{bookingNum} — not found in QuickBooks")
+                            failed += 1
+                else:
+                    if eta is not None:
+                        print(f"ETA {eta} is outside the 6-business-day window")
+                        inv = get_invoice_by_number(token, bookingNum)
+                        if inv is not None:
+                            try:
+                                process_future_invoice(page, eta, inv['Id'], bookingNum)
+                                print(f"  [OK]    #{bookingNum}\n")
+                                ok += 1
+                            except Exception as exc:
+                                print(f"  [ERROR] #{bookingNum} — {exc}\n")
+                                failed += 1                        
+                    else:
+                        print(f"  [SKIP] #{bookingNum} — ETA not found")
+                        failed += 1
+            elif (bookingNum[-1].lower() == "a") or (bookingNum[-1].lower() == "n"):
+                pass
+            elif bookingNum[-3].lower() == "nsf":
+                pass   
+            elif (bookingNum[-1].lower() == "r"):
+                print("Don't need to do this one, ends in R")
+            else:
+                print(f"Do this one manually: {bookingNum} added to failed List")            
         context.close()
-
     print(f"Done: {ok} succeeded, {failed} failed/skipped.")
 
 

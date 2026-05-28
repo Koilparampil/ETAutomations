@@ -1,12 +1,14 @@
+import asyncio
 import os
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from dotenv import load_dotenv
+from pandas import Timestamp
 from playwright.sync_api import TimeoutError as PWTimeout
 
 from QBTings.playWrightQB import _click_button, _find_input_by_label, _is_on_auth_page, _wait_for_qbo_app
-from carrierTing.carriers import carrierID
-
+import MSC.checkETA as checkMSC
+from stringTing.subjectEdit import subjectDecision
 load_dotenv()
 
 # ── Credentials ────────────────────────────────────────────────────────────────
@@ -29,30 +31,17 @@ TOKEN_URL   = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
 MINOR_VER   = 73
 QBO_WEB     = "https://qbo.intuit.com"
 SESSION_DIR = Path(".qbo_browser_session")
-
-def find_ETA(bookingNum: str) -> str:
-    ##Find ETA date based on carrier
-    match carrierID(bookingNum):
-        case "MSC":
-            # Handle MSC-specific logic
-            pass
-        case "Maersk":
-            # Handle Maersk-specific logic
-            pass
-        case "CMA":
-            # Handle CMA-specific logic
-            pass
-        case _:
-            print(f"    [warning] Unrecognized carrier for booking number: {book_number}")
-
-# ── Core Process ─────────────────────────────────────────────────────────────────
-def process_invoice(page, invoice_id: str, book_number: str):
+# ── Helper Functions ─────────────────────────────────────────────────────────────────
+def write2File(booking):
+    with open("Send2Ben.txt", "a") as f:
+        f.write(f"{booking}\n")
+        f.close()
+# ── Core Processes ─────────────────────────────────────────────────────────────────
+def process_invoice(page, eta_date: Timestamp, invoice_id: str, notif_num: bool):
     """Update ETA and send one invoice via the QBO web UI."""
     # QBO displays dates as M/D/YYYY in the US locale
-    eta_date = find_ETA(book_number)
-    dt = datetime.strptime(eta_date, "%Y-%m-%d")
-    qbo_date = f"{dt.month}/{dt.day}/{dt.year}"
-
+    qbo_date = eta_date.date().strftime("%m/%d/%Y")
+        
     # ── 1. Open the invoice edit page ─────────────────────────────────────────
     page.goto(f"{QBO_WEB}/app/invoice?txnId={invoice_id}", wait_until="load")
 
@@ -60,7 +49,10 @@ def process_invoice(page, invoice_id: str, book_number: str):
         raise RuntimeError(
             "Session expired. Delete .qbo_browser_session/ and re-run to log in again."
         )
-
+    didPay = page.locator("#balanceAmount").inner_text().strip() == "$0.00"
+    invNum = page.locator("#sales-forms-ui/reference_number").value().strip()
+    subject = subjectDecision(invNum,eta_date,notif_num,didPay)
+        
     # ── 2. Wait for invoice form then update ETA ──────────────────────────────
     # Use element visibility as the "page ready" signal — QBO's SPA never
     # reaches networkidle because it continuously makes background requests.
@@ -86,10 +78,10 @@ def process_invoice(page, invoice_id: str, book_number: str):
         subj = page.get_by_label("Subject", exact=True)
         subj.wait_for(state="visible", timeout=5_000)
         subj.dblclick()
-        subj.fill(EMAIL_SUBJECT)
-        print(f"    Subject set to: {EMAIL_SUBJECT!r}")
+        subj.fill(subject)
+        print(f"Subject set to: {subject}")
     except PWTimeout:
-        print("    [note] Subject field not found — QBO default subject will be used.")
+        print("[note] Subject field not found — QBO default subject will be used.")
 
     # ── 6. Confirm send ───────────────────────────────────────────────────────
     _click_button(page, "Send invoice")
@@ -97,3 +89,30 @@ def process_invoice(page, invoice_id: str, book_number: str):
     page.wait_for_timeout(800)
     print(f"    Email sent.")
 
+def process_future_invoice(page, eta_date: Timestamp, invoice_id: str, bookNum:str):
+    """Update ETA and send one invoice via the QBO web UI."""
+    # QBO displays dates as M/D/YYYY in the US locale
+    qbo_date = eta_date.date().strftime("%m/%d/%Y")
+        
+    # ── 1. Open the invoice edit page ─────────────────────────────────────────
+    page.goto(f"{QBO_WEB}/app/invoice?txnId={invoice_id}", wait_until="load")
+
+    if _is_on_auth_page(page):
+        raise RuntimeError(
+            "Session expired. Delete .qbo_browser_session/ and re-run to log in again."
+        )
+
+    # ── 2. Wait for invoice form then update ETA ──────────────────────────────
+    # Use element visibility as the "page ready" signal — QBO's SPA never
+    # reaches networkidle because it continuously makes background requests.
+    eta_input = _find_input_by_label(page, "Date Field")
+    eta_input.dblclick()           # select existing value
+    eta_input.fill(qbo_date)
+    eta_input.press("Tab")             # dismiss any date-picker popup
+    page.wait_for_timeout(400)
+
+    # # ── 3. Save the invoice ───────────────────────────────────────────────────
+    _click_button(page, "Save", "Save and close")
+    page.wait_for_load_state("load", timeout=15_000)
+    page.wait_for_timeout(1_500)   # let QBO finish its post-save XHRs
+    print(f"    Saved  — ETA={eta_date}")
