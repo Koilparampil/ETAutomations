@@ -90,9 +90,9 @@ async def async_sign_in_MSC(username,password):
 if __name__ == "__main__":
     try:
         load_dotenv()
-        USERNAME = os.getenv('USER_NAME') if not os.getenv('USER_NAME')==None else ""
+        USERNAME = os.getenv('MSC_USER_NAME') if not os.getenv('MSC_USER_NAME')==None else ""
         user_name = USERNAME if USERNAME is not None else ""
-        PASSWORD = os.getenv('PASSWORD') if not os.getenv('PASSWORD')==None else ""
+        PASSWORD = os.getenv('MSC_PASSWORD') if not os.getenv('MSC_PASSWORD')==None else ""
         password = PASSWORD if PASSWORD is not None else ""
         asyncio.run(async_sign_in_MSC(user_name, password))
     except Exception:
