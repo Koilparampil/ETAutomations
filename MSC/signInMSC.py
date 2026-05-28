@@ -42,10 +42,17 @@ async def async_sign_in_MSC(username,password):
             await page.locator("#onetrust-accept-btn-handler").click(timeout=300)
         except:
             pass
-        await page.wait_for_selector("#UserName", timeout=3000)
+
+        # Wait long enough for slow page loads before filling username
+        await page.wait_for_selector("#UserName", timeout=10000)
         await page.fill('#UserName', username)
         await page.evaluate("nextClicked()")
-        await page.wait_for_load_state("networkidle")
+
+        # Wait for the password field to become visible — this is the correct
+        # signal that nextClicked() finished its transition. networkidle never
+        # settles on SPAs and would hang here indefinitely.
+        await page.wait_for_selector("#password", timeout=10000)
+
         print(await page.title())
         
         await page.fill('#password', password)
