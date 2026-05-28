@@ -28,14 +28,13 @@ def pause_before_exit():
         pass
 
 
-async def async_sign_in_MSC(username,password):
+async def async_sign_in_MSC(username, password):
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
         context = await browser.new_context()
-        page =await  context.new_page()
-        
-        
+        page = await context.new_page()
+
         await page.goto(login_url)
         print(await page.title())
         try:
@@ -45,17 +44,26 @@ async def async_sign_in_MSC(username,password):
 
         # Wait long enough for slow page loads before filling username
         await page.wait_for_selector("#UserName", timeout=10000)
-        await page.fill('#UserName', username)
+
+        # Use press_sequentially instead of fill — fill() does not fire the
+        # React onChange event on this site, so the framework sees the field
+        # as empty even though the DOM value is set. press_sequentially
+        # dispatches real keystrokes which trigger React state correctly.
+        username_input = page.locator("#UserName")
+        await username_input.click()
+        await username_input.press_sequentially(username, delay=50)
+
         await page.evaluate("nextClicked()")
 
-        # Wait for the password field to become visible — this is the correct
-        # signal that nextClicked() finished its transition. networkidle never
-        # settles on SPAs and would hang here indefinitely.
+        # Wait for the password field to appear — correct signal that
+        # nextClicked() finished its page transition.
         await page.wait_for_selector("#password", timeout=10000)
-
         print(await page.title())
-        
-        await page.fill('#password', password)
+
+        password_input = page.locator("#password")
+        await password_input.click()
+        await password_input.press_sequentially(password, delay=50)
+
         await page.click("button[type='submit']")
         try:
             await page.wait_for_selector(
@@ -86,6 +94,7 @@ async def async_sign_in_MSC(username,password):
         else:
             print("failed")
         await browser.close()
+
         
 if __name__ == "__main__":
     try:
@@ -94,6 +103,7 @@ if __name__ == "__main__":
         user_name = USERNAME if USERNAME is not None else ""
         PASSWORD = os.getenv('PASSWORD') if not os.getenv('PASSWORD')==None else ""
         password = PASSWORD if PASSWORD is not None else ""
+        print(f"[debug] USERNAME from .env: {user_name!r}")
         asyncio.run(async_sign_in_MSC(user_name, password))
     except Exception:
         print("\n❌ An error occurred:\n")
