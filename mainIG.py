@@ -8,6 +8,7 @@ to update ETA and send each invoice — exactly as a user would in a browser.
 
 Setup (one-time):
     pip install playwright && playwright install chromium
+    pip install -r requirements.txt
 
 First run: opens a visible browser — log in to QBO manually once.
            The session is saved to .qbo_browser_session/ for future runs.
@@ -112,7 +113,7 @@ def main():
         for num, inv in invoices.items():
             print(f"  #{num}")
             try:
-                process_invoice(page, inv["Id"], num, eta_date)
+                process_invoice(page, inv["Id"], num)
                 print(f"  [OK]    #{num}\n")
                 ok += 1
             except Exception as exc:

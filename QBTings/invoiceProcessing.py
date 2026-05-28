@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import TimeoutError as PWTimeout
 
 from QBTings.playWrightQB import _click_button, _find_input_by_label, _is_on_auth_page, _wait_for_qbo_app
+from carrierTing.carriers import carrierID
 
 load_dotenv()
 
@@ -29,11 +30,26 @@ MINOR_VER   = 73
 QBO_WEB     = "https://qbo.intuit.com"
 SESSION_DIR = Path(".qbo_browser_session")
 
+def find_ETA(bookingNum: str) -> str:
+    ##Find ETA date based on carrier
+    match carrierID(bookingNum):
+        case "MSC":
+            # Handle MSC-specific logic
+            pass
+        case "Maersk":
+            # Handle Maersk-specific logic
+            pass
+        case "CMA":
+            # Handle CMA-specific logic
+            pass
+        case _:
+            print(f"    [warning] Unrecognized carrier for booking number: {book_number}")
 
-# ── Core logic ─────────────────────────────────────────────────────────────────
-def process_invoice(page, invoice_id: str, doc_number: str):
+# ── Core Process ─────────────────────────────────────────────────────────────────
+def process_invoice(page, invoice_id: str, book_number: str):
     """Update ETA and send one invoice via the QBO web UI."""
     # QBO displays dates as M/D/YYYY in the US locale
+    eta_date = find_ETA(book_number)
     dt = datetime.strptime(eta_date, "%Y-%m-%d")
     qbo_date = f"{dt.month}/{dt.day}/{dt.year}"
 
