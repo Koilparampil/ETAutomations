@@ -30,6 +30,7 @@ from QBTings.apiREST import get_access_token, get_invoice_by_number
 from QBTings.playWrightQB import _wait_for_qbo_app
 from QBTings.invoiceProcessing import process_future_invoice, process_invoice
 from VShip.customerLookUp import lookup_customer_notif
+from VShip.writeNotif import write_notif_in_VShip
 from carrierTing.carriers import carrierIDthenETAcheck
 from tinkyWinky import get_user_inputs
 
@@ -108,39 +109,44 @@ def main():
                         if inv is not None:
                             try:
                                 process_invoice(page, eta, inv['Id'], notif_num)
-                                
-                                print(f"  [OK]    #{bookingNum}\n")
-                                ok += 1
+                                try:
+                                    write_notif_in_VShip(eta, notif_num, bookingNum)
+                                    print(f"  [OK]    #{bookingNum}\n")
+                                    ok += 1                                    
+                                except Exception as exc:
+                                    write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
+                                    failed += 1
                             except Exception as exc:
-                                print(f"  [ERROR] #{bookingNum} — {exc}\n")
-                                write2FileFail(bookingNum)
+                                write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                 failed += 1
                         else:
-                            print(f"  [SKIP] #{bookingNum} — not found in QuickBooks")
-                            write2FileFail(bookingNum)
+                            write2FileFail(f"[SKIP] #{bookingNum} — not found in QuickBooks")
                             failed += 1
                 else:
                     if eta is not None:
-                        print(f"ETA {eta} is outside the 6-business-day window")
+                        print(f"ETA is outside the 6-business-day window")
                         inv = get_invoice_by_number(token, bookingNum)
                         if inv is not None:
                             try:
                                 process_future_invoice(page, eta, inv['Id'], bookingNum)
-                                print(f"  [OK]    #{bookingNum}\n")
-                                ok += 1
+                                try:
+                                    write_notif_in_VShip(eta, notif_num, bookingNum)
+                                    print(f"  [OK]    #{bookingNum}\n")
+                                    ok += 1                                    
+                                except Exception as exc:
+                                    write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
+                                    failed += 1
                             except Exception as exc:
-                                print(f"  [ERROR] #{bookingNum} — {exc}\n")
-                                write2FileFail(bookingNum)
+                                write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                 failed += 1                        
                     else:
-                        print(f"  [SKIP] #{bookingNum} — ETA not found")
+                        write2FileFail(f"[ERROR] #{bookingNum} — ETA not found")
                         failed += 1
-            elif (bookingNum[-1].lower() == "a") or (bookingNum[-1].lower() == "n"):
+            elif (bookingNum[-1].lower() == "a"):
                 pass
-            elif bookingNum[-3].lower() == "nsf":
-                pass   
             elif (bookingNum[-1].lower() == "r"):
                 print("Don't need to do this one, ends in R")
+                continue
             else:
                 print(f"Do this one manually: {bookingNum} added to failed List")
                 write2FileFail(bookingNum)
