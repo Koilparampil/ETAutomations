@@ -16,8 +16,6 @@ CARRIER_PATTERNS = [
     (r"S3\d{8}",          "Grimaldi"),
 ]
 
-# Characters that can appear in any booking number — used as EasyOCR allowlist
-ALLOWLIST = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 custBDay = CustomBusinessDay(calendar=USFederalHolidayCalendar())
 def add_business_days(date, business_days) ->Timestamp:
     return (date + (business_days * custBDay))
