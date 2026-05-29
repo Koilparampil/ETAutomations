@@ -40,8 +40,12 @@ HEADLESS  = os.getenv("QB_HEADLESS", "false").lower() == "true"
 SESSION_DIR = Path(".qbo_browser_session")
 
 # ── Helper Functions ─────────────────────────────────────────────────────────────────
-def write2File(booking):
+def write2BFile(booking):
     with open("Send2Ben.txt", "a") as f:
+        f.write(f"{booking}\n")
+        f.close()
+def write2FileFail(booking):
+    with open("Failed_To_Process.txt", "a") as f:
         f.write(f"{booking}\n")
         f.close()
 def pause_before_exit():
@@ -97,7 +101,7 @@ def main():
                         notif_num = False
                     if notif_num == 2:
                         print(f"Booking {bookingNum} has both Notif #1 and Notif #2. Skipping invoice update and sending to Ben.")
-                        write2File(bookingNum)
+                        write2BFile(bookingNum)
                         continue
                     else:
                         inv = get_invoice_by_number(token, bookingNum)
@@ -109,9 +113,11 @@ def main():
                                 ok += 1
                             except Exception as exc:
                                 print(f"  [ERROR] #{bookingNum} — {exc}\n")
+                                write2FileFail(bookingNum)
                                 failed += 1
                         else:
                             print(f"  [SKIP] #{bookingNum} — not found in QuickBooks")
+                            write2FileFail(bookingNum)
                             failed += 1
                 else:
                     if eta is not None:
@@ -124,6 +130,7 @@ def main():
                                 ok += 1
                             except Exception as exc:
                                 print(f"  [ERROR] #{bookingNum} — {exc}\n")
+                                write2FileFail(bookingNum)
                                 failed += 1                        
                     else:
                         print(f"  [SKIP] #{bookingNum} — ETA not found")
@@ -135,7 +142,9 @@ def main():
             elif (bookingNum[-1].lower() == "r"):
                 print("Don't need to do this one, ends in R")
             else:
-                print(f"Do this one manually: {bookingNum} added to failed List")            
+                print(f"Do this one manually: {bookingNum} added to failed List")
+                write2FileFail(bookingNum)
+                failed += 1
         context.close()
     print(f"Done: {ok} succeeded, {failed} failed/skipped.")
 
