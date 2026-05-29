@@ -20,6 +20,7 @@ Usage:
 """
 
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -143,7 +144,60 @@ def main():
                         write2FileFail(f"[ERROR] #{bookingNum} — ETA not found")
                         failed += 1
             elif (bookingNum[-1].lower() == "a"):
-                pass
+                if bookingNum[-2:].lower() == "aa":
+                    print(f"Booking {bookingNum} has both Notif #1 and Notif #2. Skipping invoice update and sending to Ben.")
+                    write2BFile(bookingNum)
+                    continue
+                elif re.search(r"(?i)[^a]a$", bookingNum):
+                    inWindow, eta = carrierIDthenETAcheck(bookingNum[:-1])
+                    if inWindow and (eta is not None):
+                        try:
+                            notif_num = lookup_customer_notif(bookingNum[:-1])
+                        except Exception as e:
+                            print(f"Error occurred while looking up customer notification for {bookingNum[:-1]}: {e}")
+                            notif_num = False
+                        if notif_num == 2:
+                            print(f"Booking {bookingNum} has both Notif #1 and Notif #2. Skipping invoice update and sending to Ben.")
+                            write2BFile(bookingNum)
+                            continue
+                        else:
+                            inv = get_invoice_by_number(token, bookingNum)
+                            if inv is not None:
+                                try:
+                                    process_invoice(page, eta, inv['Id'], notif_num)
+                                    try:
+                                        write_notif_in_VShip(eta, notif_num, bookingNum[:-1])
+                                        print(f"  [OK]    #{bookingNum}\n")
+                                        ok += 1                                    
+                                    except Exception as exc:
+                                        write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
+                                        failed += 1
+                                except Exception as exc:
+                                    write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
+                                    failed += 1
+                            else:
+                                write2FileFail(f"[SKIP] #{bookingNum} — not found in QuickBooks")
+                                failed += 1
+                    else:
+                        if eta is not None:
+                            print(f"ETA is outside the 6-business-day window")
+                            inv = get_invoice_by_number(token, bookingNum)
+                            if inv is not None:
+                                try:
+                                    process_future_invoice(page, eta, inv['Id'], bookingNum)
+                                    try:
+                                        write_notif_in_VShip(eta, notif_num, bookingNum)
+                                        print(f"  [OK]    #{bookingNum}\n")
+                                        ok += 1                                    
+                                    except Exception as exc:
+                                        write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
+                                        failed += 1
+                                except Exception as exc:
+                                    write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
+                                    failed += 1                        
+                        else:
+                            write2FileFail(f"[ERROR] #{bookingNum} — ETA not found")
+                            failed += 1
             elif (bookingNum[-1].lower() == "r"):
                 print("Don't need to do this one, ends in R")
                 continue
