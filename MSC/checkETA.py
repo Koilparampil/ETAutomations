@@ -93,9 +93,13 @@ async def checkingMSC(booking_num) -> Timestamp | None:
                     event_date = event["eventDate"]
                     event_date = pd.to_datetime(event_date, format="%d %b %Y")
                     break
+            else:
+                print(f"No ETA event found for booking {booking_num}")
+                
             # print((await gettingTracking.json())["data"]["trackingByBookingNumber"][0]["containers"][0]["events"])
         else:
             raise RuntimeError(f"Failed to get tracking info: {gettingTracking.status} {await gettingTracking.text()}")
+            
         await browser.close()
     return event_date
 

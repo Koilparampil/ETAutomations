@@ -117,12 +117,15 @@ def main():
                                 except Exception as exc:
                                     write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
                                     failed += 1
+                                    continue
                             except Exception as exc:
                                 write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                 failed += 1
+                                continue
                         else:
                             write2FileFail(f"[SKIP] #{bookingNum} — not found in QuickBooks")
                             failed += 1
+                            continue
                 else:
                     if eta is not None:
                         print(f"ETA is outside the 6-business-day window")
@@ -137,19 +140,22 @@ def main():
                                 except Exception as exc:
                                     write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
                                     failed += 1
+                                    continue
                             except Exception as exc:
                                 write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
-                                failed += 1                        
+                                failed += 1     
+                                continue                   
                     else:
                         write2FileFail(f"[ERROR] #{bookingNum} — ETA not found")
                         failed += 1
+                        continue
             elif (bookingNum[-1].lower() == "a"):
                 if bookingNum[-2:].lower() == "aa":
                     print(f"Booking {bookingNum} has both Notif #1 and Notif #2. Skipping invoice update and sending to Ben.")
                     write2BFile(bookingNum)
                     continue
                 elif re.search(r"(?i)[^a]a$", bookingNum):
-                    inWindow, eta = carrierIDthenETAcheck(bookingNum[:-1])
+                    inWindow, eta = carrierIDthenETAcheck(bookingNum[:-1].strip())
                     if inWindow and (eta is not None):
                         try:
                             notif_num = lookup_customer_notif(bookingNum[:-1])
@@ -172,12 +178,15 @@ def main():
                                     except Exception as exc:
                                         write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
                                         failed += 1
+                                        continue
                                 except Exception as exc:
                                     write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                     failed += 1
+                                    continue
                             else:
                                 write2FileFail(f"[SKIP] #{bookingNum} — not found in QuickBooks")
                                 failed += 1
+                                continue
                     else:
                         if eta is not None:
                             print(f"ETA is outside the 6-business-day window")
@@ -192,12 +201,15 @@ def main():
                                     except Exception as exc:
                                         write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
                                         failed += 1
+                                        continue
                                 except Exception as exc:
                                     write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
-                                    failed += 1                        
+                                    failed += 1      
+                                    continue                  
                         else:
                             write2FileFail(f"[ERROR] #{bookingNum} — ETA not found")
                             failed += 1
+                            continue
             elif (bookingNum[-1].lower() == "r"):
                 print("Don't need to do this one, ends in R")
                 continue
