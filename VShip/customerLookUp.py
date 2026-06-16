@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Literal
 from datetime import datetime, timedelta
@@ -5,19 +6,69 @@ from playwright.async_api import async_playwright
 import playwright.async_api
 import os
 from playwright.sync_api import sync_playwright, TimeoutError as timeException
+import requests
 from MSC.checkETA import on_response
 from VShip.syncSignInVShipCRM import sign_in_vshipcrm
 import re
 
+from tinkyWinky_log_only import UserInputs, get_user_inputs
+
 VSHIP_LOGIN_URL = "https://vshipcrm.com/Home/Index"
 
 def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
-    if Path('auth_for_VshipCRM.json').exists() and datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.json').stat().st_mtime) < timedelta(hours = 2):
+    if not booking_no:
+        print("No booking number provided")
+        raise ValueError("No booking number provided")
+    
+    if Path('auth_for_VshipCRM.txt').exists() and datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime) < timedelta(hours = 1):
         print("Using existing authentication state.")
     else:
-        VSHIP_username = os.getenv('USER_NAME') if not os.getenv('USER_NAME')==None else ""
-        VSHIP_password = os.getenv('EMAIL_PASSWORD') if not os.getenv('EMAIL_PASSWORD')==None else ""        
-        sign_in_vshipcrm(VSHIP_username, VSHIP_password)
+        inputs: UserInputs = get_user_inputs()
+        sign_in_vshipcrm(inputs.username, inputs.password) 
+    with open('auth_for_VshipCRM.txt', 'r') as f:
+        token = f.read().strip()
+
+    try:
+        resp = requests.get(
+            f"https://vship2000-prod-api.azurewebsites.net/api/Bookings/searchBooking?searchText={booking_no}&page=1&pageSize=50",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+            },
+            timeout=10,
+            )
+        resp.raise_for_status()
+        booking_id =resp.json().get("value").get("data")[0].get("bookingId")
+    except (KeyError, IndexError,AttributeError) as e:
+        print(f"Error parsing response JSON: {e}")
+        raise json.JSONDecodeError(f"Unexpected JSON structure: {resp.text}", resp.text, 0)
+    
+    
+    resp = requests.get(
+    f"https://vship2000-prod-api.azurewebsites.net/api/Bookings/{booking_id}/comments",
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+    },
+    timeout=10,
+    )
+    resp.raise_for_status()
+    try:
+        comments_all = resp.json().get("value").get("internalComments")
+        matches = [comment for comment in comments_all if ("notif #1" in comment.get("comment", "").lower())]
+        if matches:
+            if any("notif #2" in match.get("comment", "").lower() for match in matches):
+                return 2
+            else:
+                return True
+        else:
+            return False
+    except (KeyError, IndexError,AttributeError) as e:
+        print(f"Error parsing response JSON while finding notifs: {e}")
+        raise json.JSONDecodeError(f"Unexpected JSON structure for comments: {resp.text}", resp.text, 0)
+    
+##################    
+    
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(

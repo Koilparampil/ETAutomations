@@ -95,11 +95,22 @@ async def checkingMSC(booking_num) -> Timestamp | None:
                     break
             else:
                 print(f"No ETA event found for booking {booking_num}")
-                
+                for event in events:
+                    if event["eventName"] == "Full Transshipment Loaded":
+                        event_date = event["eventDate"]
+                        event_date = pd.to_datetime(event_date, format="%d %b %Y")
+                        if event_date <= (pd.Timestamp.now() - pd.Timedelta(days=6)):
+                            event_date = pd.Timestamp.now() + pd.Timedelta(days=7)
+                        elif((pd.Timestamp.now() - pd.Timedelta(days=6)) < event_date < pd.Timestamp.now()):
+                            event_date = event_date + pd.Timedelta(days=7)
+                        elif(event_date >= pd.Timestamp.now()):
+                            event_date = event_date + pd.Timedelta(days=7)
+                        break
+                else:
+                    raise ValueError(f"No Full Transshipment Loaded event found for booking {booking_num} either. Can't determine ETA.")
             # print((await gettingTracking.json())["data"]["trackingByBookingNumber"][0]["containers"][0]["events"])
         else:
             raise RuntimeError(f"Failed to get tracking info: {gettingTracking.status} {await gettingTracking.text()}")
-            
         await browser.close()
     return event_date
 

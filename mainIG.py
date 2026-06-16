@@ -31,7 +31,7 @@ from QBTings.apiREST import get_access_token, get_invoice_by_number
 from QBTings.playWrightQB import _wait_for_qbo_app
 from QBTings.invoiceProcessing import process_future_invoice, process_invoice
 from VShip.customerLookUp import lookup_customer_notif
-from VShip.writeNotif import write_notif_in_VShip
+from VShip.writeNotif import note_writing as write_notif_in_VShip
 from carrierTing.carriers import carrierIDthenETAcheck
 from tinkyWinky import get_user_inputs
 
@@ -94,7 +94,20 @@ def main():
         for bookingNum in invoice_numbers:
             print(f"Processing booking number: {bookingNum}")
             if bookingNum[-1].lower() in ["0","1","2","3","4","5","6","7","8","9"]:
-                inWindow, eta = carrierIDthenETAcheck(bookingNum)
+                try:
+                    inWindow, eta = carrierIDthenETAcheck(bookingNum)
+                except RuntimeError as e:
+                    write2FileFail(f"[ERROR] #{bookingNum} — Carrier Lookup Failed.\n{e}\n")
+                    failed += 1
+                    continue
+                except ValueError as e:
+                    write2FileFail(f"[ERROR] #{bookingNum} —  Can't determine ETA.\n{e}\n")
+                    failed += 1
+                    continue
+                except Exception as e:
+                    write2FileFail(f"[ERROR] #{bookingNum} — Unexpected error during carrier lookup.\n{e}\n")
+                    failed += 1
+                    continue
                 if inWindow and (eta is not None):
                     try:
                         notif_num = lookup_customer_notif(bookingNum)
