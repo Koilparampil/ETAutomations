@@ -6,7 +6,7 @@ from datetime import date, datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from pandas import Timestamp
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+from playwright.sync_api import Page, sync_playwright, TimeoutError as PWTimeout
 
 from QBTings.playWrightQB import _click_button, _find_input_by_label, _is_on_auth_page, _wait_for_qbo_app
 import MSC.checkETA as checkMSC
@@ -34,7 +34,7 @@ MINOR_VER   = 73
 QBO_WEB     = "https://qbo.intuit.com"
 SESSION_DIR = Path(".qbo_browser_session")
 # ── Core Processes ─────────────────────────────────────────────────────────────────
-def process_invoice(page, eta_date: Timestamp, invoice_id: str, notif_num: bool):
+def process_invoice(page: Page, eta_date: Timestamp, invoice_id: str, notif_num: bool):
     """Update ETA and send one invoice via the QBO web UI."""
     # QBO displays dates as M/D/YYYY in the US locale
     qbo_date = eta_date.date().strftime("%m/%d/%Y")
@@ -47,7 +47,7 @@ def process_invoice(page, eta_date: Timestamp, invoice_id: str, notif_num: bool)
             "Session expired. Delete .qbo_browser_session/ and re-run to log in again."
         )
     didPay = page.locator("#balanceAmount").inner_text().strip() == "$0.00"
-    invNum = page.locator("#sales-forms-ui/reference_number").value().strip()
+    invNum = page.locator("#sales-forms-ui/reference_number").input_value().strip()
     subject = subjectDecision(invNum,eta_date,notif_num,didPay)
         
     # ── 2. Wait for invoice form then update ETA ──────────────────────────────
