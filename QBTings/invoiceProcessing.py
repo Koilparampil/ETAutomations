@@ -1,10 +1,12 @@
 import asyncio
 import os
+import sys
+import traceback
 from datetime import date, datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from pandas import Timestamp
-from playwright.sync_api import TimeoutError as PWTimeout
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
 from QBTings.playWrightQB import _click_button, _find_input_by_label, _is_on_auth_page, _wait_for_qbo_app
 import MSC.checkETA as checkMSC
@@ -111,3 +113,63 @@ def process_future_invoice(page, eta_date: Timestamp, invoice_id: str, bookNum:s
     page.wait_for_load_state("load", timeout=15_000)
     page.wait_for_timeout(1_500)   # let QBO finish its post-save XHRs
     print(f"    Saved  — ETA={eta_date}")
+
+
+# ── Manual test harness ─────────────────────────────────────────────────────────
+def pause_before_exit():
+    try:
+        input("\nPress ENTER to close this window...")
+    except EOFError:
+        pass
+
+
+if __name__ == "__main__":
+    from QBTings.apiREST import get_access_token, get_invoice_by_number
+
+    try:
+        doc_number = input("Invoice DocNumber to test: ").strip()
+
+        while True:
+            raw = input("ETA date (YYYY-MM-DD): ").strip()
+            try:
+                eta_date = Timestamp(datetime.strptime(raw, "%Y-%m-%d"))
+                break
+            except ValueError:
+                print("  Invalid format — please use YYYY-MM-DD.")
+
+        future = input("Test process_future_invoice instead of process_invoice? (y/N): ").strip().lower() == "y"
+        notif_num = False
+        if not future:
+            notif_raw = input("notif_num (True/False/2) [default False]: ").strip().lower()
+            notif_num = {"true": True, "false": False, "2": 2}.get(notif_raw, False)
+
+        token = get_access_token()
+        invoice = get_invoice_by_number(token, doc_number)
+        if invoice is None:
+            sys.exit(f"Invoice #{doc_number} not found in QuickBooks.")
+
+        SESSION_DIR.mkdir(exist_ok=True)
+        with sync_playwright() as pw:
+            context = pw.chromium.launch_persistent_context(
+                str(SESSION_DIR),
+                headless=False,
+                slow_mo=200,
+                viewport={"width": 1440, "height": 900},
+                args=["--start-maximized"],
+            )
+            page = context.new_page()
+            page.goto(QBO_WEB, wait_until="load")
+            _wait_for_qbo_app(page)
+
+            if future:
+                process_future_invoice(page, eta_date, invoice["Id"], doc_number)
+            else:
+                process_invoice(page, eta_date, invoice["Id"], notif_num)
+
+            context.close()
+        print("Done.")
+    except Exception:
+        print("\n❌ An error occurred:\n")
+        traceback.print_exc()
+        pause_before_exit()
+        sys.exit(1)
