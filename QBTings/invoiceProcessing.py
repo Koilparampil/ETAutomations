@@ -31,11 +31,6 @@ TOKEN_URL   = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
 MINOR_VER   = 73
 QBO_WEB     = "https://qbo.intuit.com"
 SESSION_DIR = Path(".qbo_browser_session")
-# ── Helper Functions ─────────────────────────────────────────────────────────────────
-def write2File(booking):
-    with open("Send2Ben.txt", "a") as f:
-        f.write(f"{booking}\n")
-        f.close()
 # ── Core Processes ─────────────────────────────────────────────────────────────────
 def process_invoice(page, eta_date: Timestamp, invoice_id: str, notif_num: bool):
     """Update ETA and send one invoice via the QBO web UI."""

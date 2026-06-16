@@ -147,7 +147,7 @@ def main():
                             try:
                                 process_future_invoice(page, eta, inv['Id'], bookingNum)
                                 try:
-                                    write_notif_in_VShip(eta, notif_num, bookingNum)
+                                    write_notif_in_VShip(eta, 0, bookingNum)
                                     print(f"  [OK]    #{bookingNum}\n")
                                     ok += 1                                    
                                 except Exception as exc:
@@ -208,7 +208,7 @@ def main():
                                 try:
                                     process_future_invoice(page, eta, inv['Id'], bookingNum)
                                     try:
-                                        write_notif_in_VShip(eta, notif_num, bookingNum)
+                                        write_notif_in_VShip(eta, 0, bookingNum)
                                         print(f"  [OK]    #{bookingNum}\n")
                                         ok += 1                                    
                                     except Exception as exc:

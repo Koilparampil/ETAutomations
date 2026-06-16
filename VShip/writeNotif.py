@@ -74,7 +74,7 @@ def note_writing(eta: pd.Timestamp, notifNum: int, booking_no: str):
     if eta <= pd.Timestamp.now():
                 comment= f"ARRIVED ON {eta.strftime('%m/%d')}. NOTIF #{notifNum}"
     else:
-                comment= f"ARRIVING ON {eta.strftime('%m/%d')}. NOTIF #{notifNum}"
+                comment= f"ARRIVING ON {eta.strftime('%m/%d')}."
                 
     try:
         resp_note = requests.post(
