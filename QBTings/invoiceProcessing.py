@@ -143,7 +143,7 @@ if __name__ == "__main__":
         future = input("Test process_future_invoice instead of process_invoice? (y/N): ").strip().lower() == "y"
         notif_num = False
         if not future:
-            notif_raw = input("notif_num (True/False/2) [default False]: ").strip().lower()
+            notif_raw = input("notif_num (True/False) [default False]: ").strip().lower()
             notif_num = {"true": True, "false": False, "2": 2}.get(notif_raw, False)
 
         token = get_access_token()
