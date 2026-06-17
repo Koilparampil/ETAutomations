@@ -32,7 +32,7 @@ BASE_URL  = (
 TOKEN_URL   = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
 MINOR_VER   = 73
 QBO_WEB     = "https://qbo.intuit.com"
-SESSION_DIR = Path(".qbo_browser_session")
+SESSION_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "QB-APITesting" / "qbo_browser_session"
 # ── Core Processes ─────────────────────────────────────────────────────────────────
 def process_invoice(page: Page, eta_date: Timestamp, invoice_id: str, notif_num: bool):
     """Update ETA and send one invoice via the QBO web UI."""

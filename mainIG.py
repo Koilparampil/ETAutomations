@@ -39,7 +39,7 @@ load_dotenv(override=True)
 
 QBO_WEB     = "https://qbo.intuit.com"
 HEADLESS  = os.getenv("QB_HEADLESS", "false").lower() == "true"
-SESSION_DIR = Path(".qbo_browser_session")
+SESSION_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "QB-APITesting" / "qbo_browser_session"
 
 # ── Helper Functions ─────────────────────────────────────────────────────────────────
 def write2BFile(booking):
