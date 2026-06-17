@@ -124,7 +124,7 @@ def main():
                             try:
                                 process_invoice(page, eta, inv['Id'], notif_num)
                                 try:
-                                    write_notif_in_VShip(eta, notif_num, bookingNum)
+                                    write_notif_in_VShip(eta,1 if notif_num else 0, bookingNum)
                                     print(f"  [OK]    #{bookingNum}\n")
                                     ok += 1                                    
                                 except Exception as exc:
@@ -185,7 +185,7 @@ def main():
                                 try:
                                     process_invoice(page, eta, inv['Id'], notif_num)
                                     try:
-                                        write_notif_in_VShip(eta, notif_num, bookingNum[:-1])
+                                        write_notif_in_VShip(eta, 1 if notif_num else 0, bookingNum[:-1])
                                         print(f"  [OK]    #{bookingNum}\n")
                                         ok += 1                                    
                                     except Exception as exc:

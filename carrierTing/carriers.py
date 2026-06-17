@@ -39,3 +39,10 @@ def carrierIDthenETAcheck(booking_num):
             return(False,pd.to_datetime(4))
         case _:
             return(False,pd.to_datetime(5))
+
+
+if __name__ == "__main__":
+    test_bookings = ["EBKG17208602", "EBKG11248028"]
+    for booking in test_bookings:
+        is_msc, eta = carrierIDthenETAcheck(booking)
+        print(f"Booking: {booking} | Is MSC? {is_msc} | ETA: {eta}")

@@ -1,4 +1,10 @@
+from datetime import datetime, timedelta
+from pathlib import Path
+
 from playwright.async_api import async_playwright, TimeoutError
+from MSC.signInMSC import async_sign_in_MSC
+from VShip.syncSignInVShipCRM import sign_in_vshipcrm
+from tinkyWinky_log_only import UserInputs, get_user_inputs
 import time
 import os
 import pandas as pd
@@ -34,6 +40,14 @@ async def on_response(resp):
     print('\n')
 
 async def checkingMSC(booking_num) -> Timestamp | None:
+    if Path('MSCauthToken.json').exists() and datetime.now() - datetime.fromtimestamp(Path('MSCauthToken.json').stat().st_mtime) < timedelta(minutes = 30):
+        print("Using existing authentication state.")
+    else:
+        if os.getenv('MSC_PASSWORD') is not None:
+            await async_sign_in_MSC(os.getenv('MSC_USER_NAME') if not os.getenv('MSC_USER_NAME')==None else "", os.getenv('MSC_PASSWORD') if not os.getenv('MSC_PASSWORD')==None else "")
+        else:
+            inputs: UserInputs = get_user_inputs()
+            await async_sign_in_MSC(inputs.username, inputs.password)
     with open("MSCauthToken.json","r") as f:
         data =json.load(f)
     async with async_playwright() as p:

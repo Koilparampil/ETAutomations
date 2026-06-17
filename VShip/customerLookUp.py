@@ -27,7 +27,6 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
         sign_in_vshipcrm(inputs.username, inputs.password) 
     with open('auth_for_VshipCRM.txt', 'r') as f:
         token = f.read().strip()
-
     try:
         resp = requests.get(
             f"https://vship2000-prod-api.azurewebsites.net/api/Bookings/searchBooking?searchText={booking_no}&page=1&pageSize=50",
@@ -60,7 +59,7 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
         comments_all = resp.json().get("value").get("internalComments")
         matches = [comment for comment in comments_all if ("notif #1" in comment.get("comment", "").lower())]
         if matches:
-            if any("notif #2" in match.get("comment", "").lower() for match in matches):
+            if any("notif #2" in comment.get("comment", "").lower() for comment in comments_all):
                 return 2
             else:
                 return True
@@ -70,52 +69,17 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
         print(f"Error parsing response JSON while finding notifs: {e}")
         raise json.JSONDecodeError(f"Unexpected JSON structure for comments: {resp.text}", resp.text, 0)
     
-##################    
     
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            storage_state="auth_for_VshipCRM.json"
-        )
-        context.set_default_timeout(5000)
-        page = context.new_page()
-        page.goto("https://vshipcrm.com/Booking/Booking")
-        try:
-            search = page.locator('input[type="search"]')
-            search.fill(booking_no)
-            processing = page.locator('#booking_processing')
-            if processing.is_visible():
-                processing.wait_for(state="hidden")
-            row = page.locator(
-                '#booking tbody#tBody tr',
-                has=page.locator(f'td:nth-child(4):text-is("{booking_no}")')
-                )
-            row.wait_for(state="visible")                        
-            locator = row.locator('a.openDialog.btn.btn-warning:has-text("Edit")')
-            locator.click()
-        except timeException as e:
-            print(f"Something Timed out, trying again... {e}")
-            try:
-                page.goto("https://vshipcrm.com/Home/GlobalSearch")
-                page.fill('input[name="Booking_No"]', booking_no)
-                page.evaluate("reInitGrid()")
-                processing = page.locator('#booking_processing')
-                if processing.is_visible():
-                    processing.wait_for(state="hidden")
-                row = page.locator(
-                '#global-search-table tbody tr',
-                has=page.locator(f'td:nth-child(4):text-is("{booking_no}")')
-                )
-                row.locator('a[title="Edit"][href^="/Booking/CreateBooking/"]').click()
-            except Exception as e:
-                print(f"Error For {booking_no}:\nSomething Timed out (again)...\n{e}")
-        print("At the View Page now")
-        all_comments = page.locator("article.comments").all_inner_texts()
-        full_text = " ".join(all_comments).lower()
-        if "notif #1" in full_text:
-            if "notif #2" in full_text:
-                return 2
-            else:
-                return True
+
+if __name__ == "__main__":
+    booking_no = "EBKG17422302"
+    try:
+        result = lookup_customer_notif(booking_no)
+        if result is True:
+            print(f"Booking {booking_no} has a notif #1 but no notif #2.")
+        elif result == 2:
+            print(f"Booking {booking_no} has both notif #1 and notif #2.")
         else:
-            return False
+            print(f"Booking {booking_no} has no notif #1.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
