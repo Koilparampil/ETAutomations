@@ -46,8 +46,11 @@ def process_invoice(page: Page, eta_date: Timestamp, invoice_id: str, notif_num:
         raise RuntimeError(
             "Session expired. Delete .qbo_browser_session/ and re-run to log in again."
         )
-    didPay = page.locator("#balanceAmount").inner_text().strip() == "$0.00"
-    invNum = page.locator("#sales-forms-ui/reference_number").input_value().strip()
+    try:
+        didPay = page.locator("#balanceAmount").inner_text(timeout=5000).strip() == "$0.00"
+    except PWTimeout:
+        didPay = False
+    invNum = page.get_by_label("Invoice number").input_value().strip()
     subject = subjectDecision(invNum,eta_date,notif_num,didPay)
         
     # ── 2. Wait for invoice form then update ETA ──────────────────────────────
