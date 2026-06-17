@@ -6,7 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
-load_dotenv()
+load_dotenv(override=True)
 # ── Credentials ────────────────────────────────────────────────────────────────
 CLIENT_ID     = os.environ["QB_CLIENT_ID"]
 CLIENT_SECRET = os.environ["QB_CLIENT_SECRET"]

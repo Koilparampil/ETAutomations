@@ -7,7 +7,7 @@ import asyncio
 import sys
 import json
 
-load_dotenv()
+load_dotenv(override=True)
 LOGIN_URL = os.getenv('LOGIN_URL') if not os.getenv('LOGIN_URL')==None else ""
 login_url = LOGIN_URL if LOGIN_URL is not None else ""
 
@@ -98,7 +98,7 @@ async def async_sign_in_MSC(username, password):
         
 if __name__ == "__main__":
     try:
-        load_dotenv()
+        load_dotenv(override=True)
         USERNAME = os.getenv('MSC_USER_NAME') if not os.getenv('MSC_USER_NAME')==None else ""
         user_name = USERNAME if USERNAME is not None else ""
         PASSWORD = os.getenv('MSC_PASSWORD') if not os.getenv('MSC_PASSWORD')==None else ""

@@ -35,7 +35,7 @@ from VShip.writeNotif import note_writing as write_notif_in_VShip
 from carrierTing.carriers import carrierIDthenETAcheck
 from tinkyWinky import get_user_inputs
 
-load_dotenv()
+load_dotenv(override=True)
 
 QBO_WEB     = "https://qbo.intuit.com"
 HEADLESS  = os.getenv("QB_HEADLESS", "false").lower() == "true"

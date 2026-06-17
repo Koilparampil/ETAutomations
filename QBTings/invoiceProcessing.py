@@ -11,7 +11,7 @@ from playwright.sync_api import Page, sync_playwright, TimeoutError as PWTimeout
 from QBTings.playWrightQB import _click_button, _find_input_by_label, _is_on_auth_page, _wait_for_qbo_app
 import MSC.checkETA as checkMSC
 from stringTing.subjectEdit import subjectDecision
-load_dotenv()
+load_dotenv(override=True)
 
 # ── Credentials ────────────────────────────────────────────────────────────────
 CLIENT_ID     = os.environ["QB_CLIENT_ID"]
