@@ -155,7 +155,6 @@ if __name__ == "__main__":
                 headless=False,
                 slow_mo=200,
                 viewport={"width": 1440, "height": 900},
-                args=["--start-maximized"],
             )
             page = context.new_page()
             page.goto(QBO_WEB, wait_until="load")
