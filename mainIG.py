@@ -97,15 +97,15 @@ def main():
                 try:
                     inWindow, eta = carrierIDthenETAcheck(bookingNum)
                 except RuntimeError as e:
-                    write2FileFail(f"[ERROR] #{bookingNum} — Carrier Lookup Failed.\n{e}\n")
+                    write2FileFail(f"[ERROR] #{bookingNum} - Carrier Lookup Failed.\n{e}\n")
                     failed += 1
                     continue
                 except ValueError as e:
-                    write2FileFail(f"[ERROR] #{bookingNum} —  Can't determine ETA.\n{e}\n")
+                    write2FileFail(f"[ERROR] #{bookingNum} -  Can't determine ETA.\n{e}\n")
                     failed += 1
                     continue
                 except Exception as e:
-                    write2FileFail(f"[ERROR] #{bookingNum} — Unexpected error during carrier lookup.\n{e}\n")
+                    write2FileFail(f"[ERROR] #{bookingNum} - Unexpected error during carrier lookup.\n{e}\n")
                     failed += 1
                     continue
                 if inWindow and (eta is not None):

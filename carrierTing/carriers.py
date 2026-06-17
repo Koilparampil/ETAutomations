@@ -23,7 +23,7 @@ def add_business_days(date, business_days) ->Timestamp:
 def carrierIDthenETAcheck(booking_num):
     match booking_num:
         case b if re.search(r"EBKG\d{8}", b):
-            eta_look_up = asyncio.run(checkingMSC(booking_num))
+            eta_look_up = asyncio.get_event_loop().run_until_complete(checkingMSC(booking_num))
             if eta_look_up is not None:
                 if eta_look_up <= add_business_days(pd.Timestamp.now(),6):
                     return(True,eta_look_up)
