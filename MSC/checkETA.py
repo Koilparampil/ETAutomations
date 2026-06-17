@@ -116,7 +116,7 @@ async def checkingMSC(booking_num) -> Timestamp | None:
 
 if __name__ == "__main__":
     try:
-        print(asyncio.run(checkingMSC("EBKG15361757")))
+        print(asyncio.run(checkingMSC("EBKG11248028")))
     except Exception:
         print("\n❌ An error occurred:\n")
         traceback.print_exc()

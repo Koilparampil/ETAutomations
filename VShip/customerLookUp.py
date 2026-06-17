@@ -42,6 +42,9 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
     except (KeyError, IndexError,AttributeError) as e:
         print(f"Error parsing response JSON: {e}")
         raise json.JSONDecodeError(f"Unexpected JSON structure: {resp.text}", resp.text, 0)
+    except requests.RequestException as e:
+        print(f"HTTP request failed: {e}")
+        raise
     
     
     resp = requests.get(
