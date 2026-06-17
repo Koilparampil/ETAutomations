@@ -148,7 +148,7 @@ if __name__ == "__main__":
         if invoice is None:
             sys.exit(f"Invoice #{doc_number} not found in QuickBooks.")
 
-        SESSION_DIR.mkdir(exist_ok=True)
+        SESSION_DIR.mkdir(parents=True, exist_ok=True)
         with sync_playwright() as pw:
             context = pw.chromium.launch_persistent_context(
                 str(SESSION_DIR),

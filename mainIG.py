@@ -77,7 +77,7 @@ def main():
         sys.exit("Invoice list is empty — nothing to do.")
     token = get_access_token()
     ok = failed = 0
-    SESSION_DIR.mkdir(exist_ok=True)
+    SESSION_DIR.mkdir(parents=True, exist_ok=True)
     is_first_run = not any(SESSION_DIR.iterdir())
     with sync_playwright() as pw:
         context = pw.chromium.launch_persistent_context(
