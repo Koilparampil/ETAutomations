@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from playwright.async_api import async_playwright, TimeoutError
-from MSC.signInMSC import async_sign_in_MSC
+from playwright.sync_api import sync_playwright
+from MSC.signInMSC import sync_sign_in_MSC
 from VShip.syncSignInVShipCRM import sign_in_vshipcrm
 from tinkyWinky_log_only import UserInputs, get_user_inputs
 import time
@@ -11,7 +12,6 @@ import pandas as pd
 from pandas import Timestamp
 from dotenv import load_dotenv
 import traceback
-import asyncio
 import sys
 import json
 
@@ -36,31 +36,31 @@ async def on_response(resp):
     #     pdf_url = resp.url
     print("RESP", resp.status)
     print("Headers:", resp.headers)
-    print("Data:", await resp.json())
+    print("Data:",  resp.json())
     print('\n')
 
-async def checkingMSC(booking_num) -> Timestamp | None:
+def checkingMSC(booking_num) -> Timestamp | None:
     if Path('MSCauthToken.json').exists() and datetime.now() - datetime.fromtimestamp(Path('MSCauthToken.json').stat().st_mtime) < timedelta(minutes = 30):
         print("Using existing authentication state.")
     else:
         if os.getenv('MSC_PASSWORD') is not None:
-            await async_sign_in_MSC(os.getenv('MSC_USER_NAME') if not os.getenv('MSC_USER_NAME')==None else "", os.getenv('MSC_PASSWORD') if not os.getenv('MSC_PASSWORD')==None else "")
+            sync_sign_in_MSC(os.getenv('MSC_USER_NAME') if not os.getenv('MSC_USER_NAME')==None else "", os.getenv('MSC_PASSWORD') if not os.getenv('MSC_PASSWORD')==None else "")
         else:
             inputs: UserInputs = get_user_inputs()
-            await async_sign_in_MSC(inputs.username, inputs.password)
+            sync_sign_in_MSC(inputs.username, inputs.password)
     with open("MSCauthToken.json","r") as f:
         data =json.load(f)
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+    with sync_playwright() as p:
+        browser =  p.chromium.launch(headless=False)
 
-        context =  await browser.new_context(
+        context =   browser.new_context(
             storage_state="auth_for_MSC.json"
         )
 
-        page = await context.new_page()
-        await page.goto(TRACKING_PAGE, wait_until="domcontentloaded")
+        page =  context.new_page()
+        page.goto(TRACKING_PAGE, wait_until="domcontentloaded")
         print("At the Invoices Page now")
-        gettingTracking = await context.request.post(API_URL,
+        gettingTracking =  context.request.post(API_URL,
             headers = {
                 "referer": "https://www.mymsc.com/",
                 "mymsc-user-email": "chris@vship2000.com",
@@ -97,7 +97,7 @@ async def checkingMSC(booking_num) -> Timestamp | None:
         )
         event_date = None
         if gettingTracking.ok:
-            events = (await gettingTracking.json())["data"]["trackingByBookingNumber"][0]["containers"][0]["events"]
+            events = ( gettingTracking.json())["data"]["trackingByBookingNumber"][0]["containers"][0]["events"]
             for event in events:
                 if event["eventName"] == "Estimated Time of Arrival":
                     event_date = event["eventDate"]
@@ -122,15 +122,15 @@ async def checkingMSC(booking_num) -> Timestamp | None:
                         break
                 else:
                     raise ValueError(f"No Full Transshipment Loaded event found for booking {booking_num} either. Can't determine ETA.")
-            # print((await gettingTracking.json())["data"]["trackingByBookingNumber"][0]["containers"][0]["events"])
+            # print(( gettingTracking.json())["data"]["trackingByBookingNumber"][0]["containers"][0]["events"])
         else:
-            raise RuntimeError(f"Failed to get tracking info: {gettingTracking.status} {await gettingTracking.text()}")
-        await browser.close()
+            raise RuntimeError(f"Failed to get tracking info: {gettingTracking.status} { gettingTracking.text()}")
+        browser.close()
     return event_date
 
 if __name__ == "__main__":
     try:
-        print(asyncio.run(checkingMSC("EBKG11248028")))
+        print(checkingMSC("EBKG11248028"))
     except Exception:
         print("\n❌ An error occurred:\n")
         traceback.print_exc()
