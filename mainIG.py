@@ -95,7 +95,7 @@ def main():
             print(f"Processing booking number: {bookingNum}")
             if bookingNum[-1].lower() in ["0","1","2","3","4","5","6","7","8","9"]:
                 try:
-                    inWindow, eta = carrierIDthenETAcheck(bookingNum)
+                    inWindow, eta = carrierIDthenETAcheck(bookingNum,pw)
                 except RuntimeError as e:
                     write2FileFail(f"[ERROR] #{bookingNum} - Carrier Lookup Failed.\n{e}\n")
                     failed += 1
@@ -168,7 +168,7 @@ def main():
                     write2BFile(bookingNum)
                     continue
                 elif re.search(r"(?i)[^a]a$", bookingNum):
-                    inWindow, eta = carrierIDthenETAcheck(bookingNum[:-1].strip())
+                    inWindow, eta = carrierIDthenETAcheck(bookingNum[:-1].strip(), pw)
                     if inWindow and (eta is not None):
                         try:
                             notif_num = lookup_customer_notif(bookingNum[:-1])
