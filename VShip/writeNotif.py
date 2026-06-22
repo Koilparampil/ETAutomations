@@ -78,7 +78,7 @@ def note_writing(eta: pd.Timestamp, notifNum: int, booking_no: str):
     if eta < pd.Timestamp.now():
         comment = f"ARRIVED ON {eta.strftime('%m/%d')}. NOTIF #{notifNum+1}"
     else:
-        comment = f"ARRIVING ON {eta.strftime('%m/%d')}. NOTIF #{notifNum+1}"
+        comment = f"ARRIVING ON {eta.strftime('%m/%d')}."
     print(f"  [VShip] Posting note for booking {booking_no}: {comment!r}")
                 
                 
