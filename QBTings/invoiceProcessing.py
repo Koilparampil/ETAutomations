@@ -38,7 +38,7 @@ def process_invoice(page: Page, eta_date: Timestamp, invoice_id: str, notif_num:
     # QBO displays dates as M/D/YYYY in the US locale
     qbo_date = eta_date.date().strftime("%m/%d/%Y")
         
-    # ── 1. Open the invoice edit page ─────────────────────────────────────────
+    print(f"  [QBO] Opening invoice {invoice_id} (ETA={qbo_date})...")
     page.goto(f"{QBO_WEB}/app/invoice?txnId={invoice_id}", wait_until="load")
 
     if _is_on_auth_page(page):
@@ -50,43 +50,35 @@ def process_invoice(page: Page, eta_date: Timestamp, invoice_id: str, notif_num:
     except PWTimeout:
         didPay = False
     invNum = page.get_by_label("Invoice number").input_value().strip()
-    subject = subjectDecision(invNum,eta_date,notif_num,didPay)
-        
-    # ── 2. Wait for invoice form then update ETA ──────────────────────────────
-    # Use element visibility as the "page ready" signal — QBO's SPA never
-    # reaches networkidle because it continuously makes background requests.
+    print(f"  [QBO] Invoice #{invNum} | Balance paid: {didPay}")
+    subject = subjectDecision(invNum, eta_date, notif_num, didPay)
+
+    print(f"  [QBO] Setting ETA field to {qbo_date}...")
     eta_input = _find_input_by_label(page, "Date Field")
-    eta_input.dblclick()           # select existing value
+    eta_input.dblclick()
     eta_input.fill(qbo_date)
-    eta_input.press("Tab")             # dismiss any date-picker popup
+    eta_input.press("Tab")
     page.wait_for_timeout(400)
 
-    # # ── 3. Save the invoice ───────────────────────────────────────────────────
-    # _click_button(page, "Save", "Save and close")
-    # page.wait_for_load_state("load", timeout=15_000)
-    # page.wait_for_timeout(1_500)   # let QBO finish its post-save XHRs
-    # print(f"    Saved  — ETA={eta_date}")
-
-    # ── 4. Open send dialog ───────────────────────────────────────────────────
+    print(f"  [QBO] Opening send dialog...")
     _click_button(page, "Review and send")
     page.wait_for_load_state("load", timeout=15_000)
     page.wait_for_timeout(800)
 
-    # ── 5. Update email subject ───────────────────────────────────────────────
     try:
         subj = page.get_by_label("Subject", exact=True)
         subj.wait_for(state="visible", timeout=5_000)
         subj.dblclick()
         subj.fill(subject)
-        print(f"Subject set to: {subject}")
+        print(f"  [QBO] Subject set to: {subject!r}")
     except PWTimeout:
-        print("[note] Subject field not found - QBO default subject will be used.")
+        print("  [QBO] Subject field not found — QBO default subject will be used.")
 
-    # ── 6. Confirm send ───────────────────────────────────────────────────────
+    print(f"  [QBO] Confirming send...")
     _click_button(page, "Send invoice")
     page.wait_for_load_state("load", timeout=15_000)
     page.wait_for_timeout(800)
-    print(f"    Email sent.")
+    print(f"  [QBO] Email sent for invoice #{invNum}.")
 
 def process_future_invoice(page, eta_date: Timestamp, invoice_id: str, bookNum:str):
     """Update ETA and send one invoice via the QBO web UI."""
@@ -101,20 +93,19 @@ def process_future_invoice(page, eta_date: Timestamp, invoice_id: str, bookNum:s
             "Session expired. Delete .qbo_browser_session/ and re-run to log in again."
         )
 
-    # ── 2. Wait for invoice form then update ETA ──────────────────────────────
-    # Use element visibility as the "page ready" signal — QBO's SPA never
-    # reaches networkidle because it continuously makes background requests.
+    print(f"  [QBO] Opening future invoice {invoice_id} (ETA={qbo_date})...")
+    print(f"  [QBO] Setting ETA field to {qbo_date}...")
     eta_input = _find_input_by_label(page, "Date Field")
-    eta_input.dblclick()           # select existing value
+    eta_input.dblclick()
     eta_input.fill(qbo_date)
-    eta_input.press("Tab")             # dismiss any date-picker popup
+    eta_input.press("Tab")
     page.wait_for_timeout(400)
 
-    # # ── 3. Save the invoice ───────────────────────────────────────────────────
+    print(f"  [QBO] Saving invoice (ETA outside send window)...")
     _click_button(page, "Save", "Save and close")
     page.wait_for_load_state("load", timeout=15_000)
-    page.wait_for_timeout(1_500)   # let QBO finish its post-save XHRs
-    print(f"    Saved  - ETA={eta_date}")
+    page.wait_for_timeout(1_500)
+    print(f"  [QBO] Saved — ETA={eta_date.date()}")
 
 
 # ── Manual test harness ─────────────────────────────────────────────────────────

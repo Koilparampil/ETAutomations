@@ -77,9 +77,16 @@ def main():
         sys.exit(1)
     if not invoice_numbers:
         sys.exit("Invoice list is empty - nothing to do.")
+    print(f"Loaded {len(invoice_numbers)} booking(s) from file.")
+    print("Fetching QuickBooks access token...")
     token = get_access_token()
+    print("QuickBooks token obtained.")
+    print("Signing in to MSC...")
     sync_sign_in_MSC_complete(inputs.MSC_username, inputs.MSC_password)
+    print("MSC sign-in complete.")
+    print("Signing in to VShip CRM...")
     sign_in_vshipcrm(inputs.VSHIP_username, inputs.VSHIP_password)
+    print("VShip CRM sign-in complete.")
     ok = failed = 0
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     is_first_run = not any(SESSION_DIR.iterdir())
@@ -89,14 +96,14 @@ def main():
             headless=HEADLESS and not is_first_run,
             slow_mo=200,
             viewport={"width": 1440, "height": 900},
-            args=["--start-maximized"],
         )
         page = context.new_page()
-        # Trigger login check
         page.goto(QBO_WEB, wait_until="load")
         _wait_for_qbo_app(page)
+        print(f"\nStarting browser processing of {len(invoice_numbers)} booking(s)...\n")
         for bookingNum in invoice_numbers:
-            print(f"Processing booking number: {bookingNum}")
+            print(f"{'─'*50}")
+            print(f"Processing: {bookingNum}")
             if bookingNum[-1].lower() in ["0","1","2","3","4","5","6","7","8","9"]:
                 try:
                     inWindow, eta = carrierIDthenETAcheck(bookingNum,pw)
@@ -112,12 +119,15 @@ def main():
                     write2FileFail(f"[ERROR] #{bookingNum} - Unexpected error during carrier lookup.\n{e}\n")
                     failed += 1
                     continue
+                print(f"  ETA: {eta.date() if eta is not None else 'N/A'} | In 6-day window: {inWindow}")
                 if inWindow and (eta is not None):
+                    print(f"  Looking up VShip notifications for {bookingNum}...")
                     try:
                         notif_num = lookup_customer_notif(bookingNum)
                     except Exception as e:
-                        print(f"Error occurred while looking up customer notification for {bookingNum}: {e}")
+                        print(f"  [WARN] Notif lookup failed: {e} — defaulting to False")
                         notif_num = False
+                    print(f"  Notif status: {notif_num}")
                     if notif_num == 2:
                         print(f"Booking {bookingNum} has both Notif #1 and Notif #2. Skipping invoice update and sending to Ben.")
                         write2BFile(bookingNum)

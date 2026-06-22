@@ -23,22 +23,24 @@ def add_business_days(date, business_days) ->Timestamp:
 def carrierIDthenETAcheck(booking_num:str, pw:Playwright) -> tuple[bool, pd.Timestamp | None]:
     match booking_num:
         case b if re.search(r"EBKG\d{8}", b):
+            print(f"  [Carrier] Identified as MSC — querying tracking API...")
             eta_look_up = checkingMSC(booking_num, pw)
             if eta_look_up is not None:
-                if eta_look_up <= add_business_days(pd.Timestamp.now(),6):
-                    return(True,eta_look_up)
-                else:
-                    return(False,eta_look_up)
+                window_cutoff = add_business_days(pd.Timestamp.now(), 6)
+                in_window = eta_look_up <= window_cutoff
+                print(f"  [Carrier] ETA={eta_look_up.date()} | Cutoff={window_cutoff.date()} | InWindow={in_window}")
+                return (in_window, eta_look_up)
             else:
-                return(False,None)
+                print(f"  [Carrier] MSC returned no ETA for {booking_num}")
+                return (False, None)
         case b if re.fullmatch(r"2\d{8}", b):
-            return(False,pd.to_datetime(2))
+            raise RuntimeError(f"Maersk ETA lookup not yet implemented for booking {booking_num}")
         case b if re.search(r"NAM\d{7}", b):
-            return(False,pd.to_datetime(3))
+            raise RuntimeError(f"CMA ETA lookup not yet implemented for booking {booking_num}")
         case b if re.search(r"S3\d{8}", b):
-            return(False,pd.to_datetime(4))
+            raise RuntimeError(f"Grimaldi ETA lookup not yet implemented for booking {booking_num}")
         case _:
-            return(False,pd.to_datetime(5))
+            raise RuntimeError(f"No carrier pattern matched booking {booking_num} — process manually")
 
 
 if __name__ == "__main__":

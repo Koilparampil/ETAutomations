@@ -20,13 +20,16 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
         print("No booking number provided")
         raise ValueError("No booking number provided")
     
-    if Path('auth_for_VshipCRM.txt').exists() and datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime) < timedelta(hours = 1):
-        print("Using existing authentication state.")
+    token_age = (datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime)) if Path('auth_for_VshipCRM.txt').exists() else None
+    if token_age is not None and token_age < timedelta(hours=1):
+        print(f"  [VShip] Using cached VShip token (age: {int(token_age.total_seconds()//60)}m)")
     else:
+        print("  [VShip] Token missing or expired — prompting for VShip login...")
         inputs: UserInputs = get_user_inputs("VShip Login")
-        sign_in_vshipcrm(inputs.username, inputs.password) 
+        sign_in_vshipcrm(inputs.username, inputs.password)
     with open('auth_for_VshipCRM.txt', 'r') as f:
         token = f.read().strip()
+    print(f"  [VShip] Searching for booking {booking_no}...")
     try:
         resp = requests.get(
             f"https://vship2000-prod-api.azurewebsites.net/api/Bookings/searchBooking?searchText={booking_no}&page=1&pageSize=50",
@@ -37,8 +40,9 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
             timeout=10,
             )
         resp.raise_for_status()
-        booking_id =resp.json().get("value").get("data")[0].get("bookingId")
-    except (KeyError, IndexError,AttributeError) as e:
+        booking_id = resp.json().get("value").get("data")[0].get("bookingId")
+        print(f"  [VShip] Found booking ID: {booking_id}")
+    except (KeyError, IndexError, AttributeError) as e:
         print(f"Error parsing response JSON: {e}")
         raise json.JSONDecodeError(f"Unexpected JSON structure: {resp.text}", resp.text, 0)
     except requests.RequestException as e:
@@ -60,10 +64,13 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
         matches = [comment for comment in comments_all if ("notif #1" in comment.get("comment", "").lower())]
         if matches:
             if any("notif #2" in comment.get("comment", "").lower() for comment in comments_all):
+                print(f"  [VShip] Notif result: both #1 and #2 found → 2")
                 return 2
             else:
+                print(f"  [VShip] Notif result: Notif #1 found, no #2 → True")
                 return True
         else:
+            print(f"  [VShip] Notif result: no Notif #1 found → False")
             return False
     except (KeyError, IndexError,AttributeError) as e:
         print(f"Error parsing response JSON while finding notifs: {e}")

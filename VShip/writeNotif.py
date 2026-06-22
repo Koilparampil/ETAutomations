@@ -76,9 +76,10 @@ def note_writing(eta: pd.Timestamp, notifNum: int, booking_no: str):
     
     comment = ""
     if eta < pd.Timestamp.now():
-                comment= f"ARRIVED ON {eta.strftime('%m/%d')}. NOTIF #{notifNum+1}"
+        comment = f"ARRIVED ON {eta.strftime('%m/%d')}. NOTIF #{notifNum+1}"
     else:
-                comment= f"ARRIVING ON {eta.strftime('%m/%d')}."
+        comment = f"ARRIVING ON {eta.strftime('%m/%d')}. NOTIF #{notifNum+1}"
+    print(f"  [VShip] Posting note for booking {booking_no}: {comment!r}")
                 
                 
                 
@@ -99,10 +100,12 @@ def note_writing(eta: pd.Timestamp, notifNum: int, booking_no: str):
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
             "Referer": "https://vshipcrm.com/"},
         )
-        if resp_note.status_code != 201 and resp_note.status_code not in [400,401,403]:
+        if resp_note.status_code == 201:
+            print(f"  [VShip] Note posted successfully (201).")
+        elif resp_note.status_code not in [400, 401, 403]:
             raise ValueError(f"Note creation failed with status code: {resp_note.status_code}\n{resp_note.text}")
         elif resp_note.status_code in [400,401,403] and (datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime) > timedelta(minutes = 3)):
-            print(f"Note creation failed with status code: {resp_note.status_code}. ReSigning In")
+            print(f"  [VShip] Auth error ({resp_note.status_code}) — token may have expired. Re-signing in...")
             inputs: UserInputs = get_user_inputs("VShip Login")
             sign_in_vshipcrm(inputs.username, inputs.password)
             with open('auth_for_VshipCRM.txt', 'r') as f:

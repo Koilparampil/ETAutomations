@@ -39,27 +39,29 @@ async def on_response(resp):
     print('\n')
 
 def checkingMSC(booking_num: str, pw: Playwright) -> Timestamp | None:
-    if Path('MSCauthToken.json').exists() and datetime.now() - datetime.fromtimestamp(Path('MSCauthToken.json').stat().st_mtime) < timedelta(minutes = 30):
-        print("Using existing authentication state.")
+    token_age = (datetime.now() - datetime.fromtimestamp(Path('MSCauthToken.json').stat().st_mtime)) if Path('MSCauthToken.json').exists() else None
+    if token_age is not None and token_age < timedelta(minutes=30):
+        print(f"  [MSC] Using cached auth token (age: {int(token_age.total_seconds()//60)}m)")
     else:
+        print("  [MSC] Auth token missing or expired — signing in...")
         if os.getenv('MSC_PASSWORD') is not None:
-            sync_sign_in_MSC(os.getenv('MSC_USER_NAME') if not os.getenv('MSC_USER_NAME')==None else "", os.getenv('MSC_PASSWORD') if not os.getenv('MSC_PASSWORD')==None else "",pw)
+            sync_sign_in_MSC(os.getenv('MSC_USER_NAME') or "", os.getenv('MSC_PASSWORD') or "", pw)
         else:
             inputs: UserInputs = get_user_inputs("MSC Login")
-            sync_sign_in_MSC(inputs.username, inputs.password,pw)
-    with open("MSCauthToken.json","r") as f:
-        data =json.load(f)
-    
-        browser = pw.chromium.launch(headless=False)
+            sync_sign_in_MSC(inputs.username, inputs.password, pw)
+        print("  [MSC] Sign-in complete.")
+    with open("MSCauthToken.json", "r") as f:
+        data = json.load(f)
 
-        context =   browser.new_context(
-            storage_state="auth_for_MSC.json"
-        )
-
-        page =  context.new_page()
-        page.goto(TRACKING_PAGE, wait_until="domcontentloaded")
-        print("At the Invoices Page now")
-        gettingTracking =  context.request.post(API_URL,
+    print(f"  [MSC] Querying tracking API for booking {booking_num}...")
+    browser = pw.chromium.launch(headless=False)
+    context = browser.new_context(
+        storage_state="auth_for_MSC.json"
+    )
+    page = context.new_page()
+    page.goto(TRACKING_PAGE, wait_until="domcontentloaded")
+    print("  [MSC] At tracking page — sending GraphQL request...")
+    gettingTracking = context.request.post(API_URL,
             headers = {
                 "referer": "https://www.mymsc.com/",
                 "mymsc-user-email": "chris@vship2000.com",
@@ -94,37 +96,38 @@ def checkingMSC(booking_num: str, pw: Playwright) -> Timestamp | None:
                 "operationName": "trackingByBookingNumber"
             },
         )
-        event_date = None
-        if gettingTracking.ok:
-            events = ( gettingTracking.json())["data"]["trackingByBookingNumber"][0]["containers"][0]["events"]
+    event_date = None
+    if gettingTracking.ok:
+        print(f"  [MSC] Tracking API responded OK — parsing events...")
+        events = gettingTracking.json()["data"]["trackingByBookingNumber"][0]["containers"][0]["events"]
+        for event in events:
+            if event["eventName"] == "Estimated Time of Arrival":
+                event_date = pd.to_datetime(event["eventDate"], format="%d %b %Y")
+                print(f"  [MSC] Found 'Estimated Time of Arrival': {event_date.date()}")
+                break
+            if event["eventName"] == "Import Discharged from Vessel":
+                event_date = pd.to_datetime(event["eventDate"], format="%d %b %Y")
+                print(f"  [MSC] Found 'Import Discharged from Vessel': {event_date.date()}")
+                break
+        else:
+            print(f"  [MSC] No ETA/Discharged event found — falling back to Full Transshipment Loaded...")
             for event in events:
-                if event["eventName"] == "Estimated Time of Arrival":
-                    event_date = event["eventDate"]
-                    event_date = pd.to_datetime(event_date, format="%d %b %Y")
-                    break
-                if event["eventName"] == "Import Discharged from Vessel":
-                    event_date = event["eventDate"]
-                    event_date = pd.to_datetime(event_date, format="%d %b %Y")
+                if event["eventName"] == "Full Transshipment Loaded":
+                    event_date = pd.to_datetime(event["eventDate"], format="%d %b %Y")
+                    if event_date <= (pd.Timestamp.now() - pd.Timedelta(days=6)):
+                        event_date = pd.Timestamp.now() + pd.Timedelta(days=7)
+                    elif (pd.Timestamp.now() - pd.Timedelta(days=6)) < event_date < pd.Timestamp.now():
+                        event_date = event_date + pd.Timedelta(days=7)
+                    elif event_date >= pd.Timestamp.now():
+                        event_date = event_date + pd.Timedelta(days=7)
+                    print(f"  [MSC] Estimated ETA from transshipment date: {event_date.date()}")
                     break
             else:
-                print(f"No ETA event found for booking {booking_num}")
-                for event in events:
-                    if event["eventName"] == "Full Transshipment Loaded":
-                        event_date = event["eventDate"]
-                        event_date = pd.to_datetime(event_date, format="%d %b %Y")
-                        if event_date <= (pd.Timestamp.now() - pd.Timedelta(days=6)):
-                            event_date = pd.Timestamp.now() + pd.Timedelta(days=7)
-                        elif((pd.Timestamp.now() - pd.Timedelta(days=6)) < event_date < pd.Timestamp.now()):
-                            event_date = event_date + pd.Timedelta(days=7)
-                        elif(event_date >= pd.Timestamp.now()):
-                            event_date = event_date + pd.Timedelta(days=7)
-                        break
-                else:
-                    raise ValueError(f"No Full Transshipment Loaded event found for booking {booking_num} either. Can't determine ETA.")
-            # print(( gettingTracking.json())["data"]["trackingByBookingNumber"][0]["containers"][0]["events"])
-        else:
-            raise RuntimeError(f"Failed to get tracking info: {gettingTracking.status} { gettingTracking.text()}")
-        browser.close()
+                raise ValueError(f"No Full Transshipment Loaded event found for booking {booking_num} either. Can't determine ETA.")
+    else:
+        raise RuntimeError(f"Failed to get tracking info: {gettingTracking.status} {gettingTracking.text()}")
+    browser.close()
+    print(f"  [MSC] Browser closed. Returning ETA: {event_date.date() if event_date is not None else 'None'}")
     return event_date
 
 if __name__ == "__main__":
