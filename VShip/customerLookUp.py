@@ -23,7 +23,7 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
     if Path('auth_for_VshipCRM.txt').exists() and datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime) < timedelta(hours = 1):
         print("Using existing authentication state.")
     else:
-        inputs: UserInputs = get_user_inputs()
+        inputs: UserInputs = get_user_inputs("VShip Login")
         sign_in_vshipcrm(inputs.username, inputs.password) 
     with open('auth_for_VshipCRM.txt', 'r') as f:
         token = f.read().strip()

@@ -45,7 +45,7 @@ def checkingMSC(booking_num: str, pw: Playwright) -> Timestamp | None:
         if os.getenv('MSC_PASSWORD') is not None:
             sync_sign_in_MSC(os.getenv('MSC_USER_NAME') if not os.getenv('MSC_USER_NAME')==None else "", os.getenv('MSC_PASSWORD') if not os.getenv('MSC_PASSWORD')==None else "",pw)
         else:
-            inputs: UserInputs = get_user_inputs()
+            inputs: UserInputs = get_user_inputs("MSC Login")
             sync_sign_in_MSC(inputs.username, inputs.password,pw)
     with open("MSCauthToken.json","r") as f:
         data =json.load(f)

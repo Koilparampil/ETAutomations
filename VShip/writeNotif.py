@@ -51,7 +51,7 @@ def note_writing(eta: pd.Timestamp, notifNum: int, booking_no: str):
     if Path('auth_for_VshipCRM.txt').exists() and datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime) < timedelta(hours = 1):
         print("Using existing authentication state.")
     else:
-        inputs: UserInputs = get_user_inputs()
+        inputs: UserInputs = get_user_inputs("VShip Login")
         sign_in_vshipcrm(inputs.username, inputs.password) 
     with open('auth_for_VshipCRM.txt', 'r') as f:
         token = f.read().strip()
@@ -103,7 +103,7 @@ def note_writing(eta: pd.Timestamp, notifNum: int, booking_no: str):
             raise ValueError(f"Note creation failed with status code: {resp_note.status_code}\n{resp_note.text}")
         elif resp_note.status_code in [400,401,403] and (datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime) > timedelta(minutes = 3)):
             print(f"Note creation failed with status code: {resp_note.status_code}. ReSigning In")
-            inputs: UserInputs = get_user_inputs()
+            inputs: UserInputs = get_user_inputs("VShip Login")
             sign_in_vshipcrm(inputs.username, inputs.password)
             with open('auth_for_VshipCRM.txt', 'r') as f:
                 token = f.read().strip()

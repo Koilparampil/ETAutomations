@@ -10,9 +10,9 @@ class UserInputs:
     password: str = ""
 
 
-def get_user_inputs() -> UserInputs:
+def get_user_inputs(title:str) -> UserInputs:
     root = tk.Tk()
-    root.title("VShip Login")
+    root.title(title)
     root.resizable(False, False)
 
     result: UserInputs | None = None
