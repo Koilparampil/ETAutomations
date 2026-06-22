@@ -20,7 +20,7 @@ def _wait_for_qbo_app(page, timeout: int = 180_000):
         # e.g. https://qbo.intuit.com/app/homepage
         page.wait_for_url("**/app/homepage?**", timeout=timeout)
         page.wait_for_load_state("load", timeout=15_000)
-        print("[browser] Logged in — continuing.\n")
+        print("[browser] Logged in - continuing.\n")
 
 
 def _find_input_by_label(page, label: str, timeout: int = 8_000):
@@ -42,7 +42,7 @@ def _find_input_by_label(page, label: str, timeout: int = 8_000):
             continue
     raise RuntimeError(
         f"Could not locate '{label}' input on the page. "
-        "QBO may have changed its UI — inspect the field in Chrome DevTools "
+        "QBO may have changed its UI - inspect the field in Chrome DevTools "
         "and update the locator in _find_input_by_label()."
     )
 
@@ -59,5 +59,5 @@ def _click_button(page, *names: str, timeout: int = 8_000):
             continue
     raise RuntimeError(
         f"None of these buttons were found: {names}. "
-        "QBO UI may have changed — check the button text in the browser."
+        "QBO UI may have changed - check the button text in the browser."
     )

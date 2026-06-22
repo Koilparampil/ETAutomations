@@ -32,7 +32,7 @@ def get_access_token() -> str:
     resp.raise_for_status()
     data = resp.json()
     if (new_rt := data.get("refresh_token")) and new_rt != REFRESH_TOKEN:
-        print("[warning] Refresh token rotated — update QB_REFRESH_TOKEN in .env")
+        print("[warning] Refresh token rotated - update QB_REFRESH_TOKEN in .env")
     return data["access_token"]
 
 

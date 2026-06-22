@@ -80,7 +80,7 @@ def process_invoice(page: Page, eta_date: Timestamp, invoice_id: str, notif_num:
         subj.fill(subject)
         print(f"Subject set to: {subject}")
     except PWTimeout:
-        print("[note] Subject field not found — QBO default subject will be used.")
+        print("[note] Subject field not found - QBO default subject will be used.")
 
     # ── 6. Confirm send ───────────────────────────────────────────────────────
     _click_button(page, "Send invoice")
@@ -114,7 +114,7 @@ def process_future_invoice(page, eta_date: Timestamp, invoice_id: str, bookNum:s
     _click_button(page, "Save", "Save and close")
     page.wait_for_load_state("load", timeout=15_000)
     page.wait_for_timeout(1_500)   # let QBO finish its post-save XHRs
-    print(f"    Saved  — ETA={eta_date}")
+    print(f"    Saved  - ETA={eta_date}")
 
 
 # ── Manual test harness ─────────────────────────────────────────────────────────
@@ -137,7 +137,7 @@ if __name__ == "__main__":
                 eta_date = Timestamp(datetime.strptime(raw, "%Y-%m-%d"))
                 break
             except ValueError:
-                print("  Invalid format — please use YYYY-MM-DD.")
+                print("  Invalid format - please use YYYY-MM-DD.")
 
         future = input("Test process_future_invoice instead of process_invoice? (y/N): ").strip().lower() == "y"
         notif_num = False

@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-QBO Invoice ETA Updater — Browser Automation
+QBO Invoice ETA Updater - Browser Automation
 ---------------------------------------------
 The ETA field is a User Defined Custom Field (UDCF) that QBO's REST API v3
 cannot write to. This script drives the QBO web interface with Playwright
-to update ETA and send each invoice — exactly as a user would in a browser.
+to update ETA and send each invoice - exactly as a user would in a browser.
 
 Setup (one-time):
     pip install playwright && playwright install chromium
     pip install -r requirements.txt
 
-First run: opens a visible browser — log in to QBO manually once.
+First run: opens a visible browser - log in to QBO manually once.
            The session is saved to .qbo_browser_session/ for future runs.
 Subsequent runs: reuses the saved session (headed by default; set
                  QB_HEADLESS=true in .env for silent/headless mode).
@@ -27,10 +27,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
+from MSC.signInMSC import sync_sign_in_MSC_complete
 from QBTings.apiREST import get_access_token, get_invoice_by_number
 from QBTings.playWrightQB import _wait_for_qbo_app
 from QBTings.invoiceProcessing import process_future_invoice, process_invoice
 from VShip.customerLookUp import lookup_customer_notif
+from VShip.syncSignInVShipCRM import sign_in_vshipcrm
 from VShip.writeNotif import note_writing as write_notif_in_VShip
 from carrierTing.carriers import carrierIDthenETAcheck
 from tinkyWinky import get_user_inputs
@@ -74,8 +76,10 @@ def main():
         pause_before_exit()
         sys.exit(1)
     if not invoice_numbers:
-        sys.exit("Invoice list is empty — nothing to do.")
+        sys.exit("Invoice list is empty - nothing to do.")
     token = get_access_token()
+    sync_sign_in_MSC_complete(inputs.MSC_username, inputs.MSC_password)
+    sign_in_vshipcrm(inputs.VSHIP_username, inputs.VSHIP_password)
     ok = failed = 0
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     is_first_run = not any(SESSION_DIR.iterdir())
@@ -128,15 +132,15 @@ def main():
                                     print(f"  [OK]    #{bookingNum}\n")
                                     ok += 1                                    
                                 except Exception as exc:
-                                    write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
+                                    write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, Email Still Sent\n{exc}\n")
                                     failed += 1
                                     continue
                             except Exception as exc:
-                                write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
+                                write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                 failed += 1
                                 continue
                         else:
-                            write2FileFail(f"[SKIP] #{bookingNum} — not found in QuickBooks")
+                            write2FileFail(f"[SKIP] #{bookingNum} - not found in QuickBooks")
                             failed += 1
                             continue
                 else:
@@ -151,15 +155,15 @@ def main():
                                     print(f"  [OK]    #{bookingNum}\n")
                                     ok += 1                                    
                                 except Exception as exc:
-                                    write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
+                                    write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, Email Still Sent\n{exc}\n")
                                     failed += 1
                                     continue
                             except Exception as exc:
-                                write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
+                                write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                 failed += 1     
                                 continue                   
                     else:
-                        write2FileFail(f"[ERROR] #{bookingNum} — ETA not found")
+                        write2FileFail(f"[ERROR] #{bookingNum} - ETA not found")
                         failed += 1
                         continue
             elif (bookingNum[-1].lower() == "a"):
@@ -189,15 +193,15 @@ def main():
                                         print(f"  [OK]    #{bookingNum}\n")
                                         ok += 1                                    
                                     except Exception as exc:
-                                        write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
+                                        write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, Email Still Sent\n{exc}\n")
                                         failed += 1
                                         continue
                                 except Exception as exc:
-                                    write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
+                                    write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                     failed += 1
                                     continue
                             else:
-                                write2FileFail(f"[SKIP] #{bookingNum} — not found in QuickBooks")
+                                write2FileFail(f"[SKIP] #{bookingNum} - not found in QuickBooks")
                                 failed += 1
                                 continue
                     else:
@@ -212,15 +216,15 @@ def main():
                                         print(f"  [OK]    #{bookingNum}\n")
                                         ok += 1                                    
                                     except Exception as exc:
-                                        write2FileFail(f"[ERROR] #{bookingNum} — Note Write Error, Email Still Sent\n{exc}\n")
+                                        write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, Email Still Sent\n{exc}\n")
                                         failed += 1
                                         continue
                                 except Exception as exc:
-                                    write2FileFail(f"[ERROR] #{bookingNum} — QB Invoice Processing Error, No Email Sent\n{exc}\n")
+                                    write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                     failed += 1      
                                     continue                  
                         else:
-                            write2FileFail(f"[ERROR] #{bookingNum} — ETA not found")
+                            write2FileFail(f"[ERROR] #{bookingNum} - ETA not found")
                             failed += 1
                             continue
             elif (bookingNum[-1].lower() == "r"):
