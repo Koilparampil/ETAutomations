@@ -5,6 +5,7 @@ import pandas as pd
 from pandas import Timestamp
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
+from playwright.sync_api import Playwright, sync_playwright
 
 from MSC.checkETA import checkingMSC
 
@@ -19,10 +20,10 @@ custBDay = CustomBusinessDay(calendar=USFederalHolidayCalendar())
 def add_business_days(date, business_days) ->Timestamp:
     return (date + (business_days * custBDay))
 
-def carrierIDthenETAcheck(booking_num):
+def carrierIDthenETAcheck(booking_num:str, pw:Playwright) -> tuple[bool, pd.Timestamp | None]:
     match booking_num:
         case b if re.search(r"EBKG\d{8}", b):
-            eta_look_up = checkingMSC(booking_num)
+            eta_look_up = checkingMSC(booking_num, pw)
             if eta_look_up is not None:
                 if eta_look_up <= add_business_days(pd.Timestamp.now(),6):
                     return(True,eta_look_up)
@@ -43,5 +44,6 @@ def carrierIDthenETAcheck(booking_num):
 if __name__ == "__main__":
     test_bookings = ["EBKG17208602", "EBKG11248028"]
     for booking in test_bookings:
-        is_msc, eta = carrierIDthenETAcheck(booking)
-        print(f"Booking: {booking} | Is MSC? {is_msc} | ETA: {eta}")
+        with sync_playwright() as p:
+            is_msc, eta = carrierIDthenETAcheck(booking, p)
+            print(f"Booking: {booking} | Is MSC? {is_msc} | ETA: {eta}")

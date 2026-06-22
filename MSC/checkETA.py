@@ -1,8 +1,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from playwright.async_api import async_playwright, TimeoutError
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Playwright, sync_playwright
 from MSC.signInMSC import sync_sign_in_MSC
 from VShip.syncSignInVShipCRM import sign_in_vshipcrm
 from tinkyWinky_log_only import UserInputs, get_user_inputs
@@ -39,19 +38,19 @@ async def on_response(resp):
     print("Data:",  resp.json())
     print('\n')
 
-def checkingMSC(booking_num) -> Timestamp | None:
+def checkingMSC(booking_num: str, pw: Playwright) -> Timestamp | None:
     if Path('MSCauthToken.json').exists() and datetime.now() - datetime.fromtimestamp(Path('MSCauthToken.json').stat().st_mtime) < timedelta(minutes = 30):
         print("Using existing authentication state.")
     else:
         if os.getenv('MSC_PASSWORD') is not None:
-            sync_sign_in_MSC(os.getenv('MSC_USER_NAME') if not os.getenv('MSC_USER_NAME')==None else "", os.getenv('MSC_PASSWORD') if not os.getenv('MSC_PASSWORD')==None else "")
+            sync_sign_in_MSC(os.getenv('MSC_USER_NAME') if not os.getenv('MSC_USER_NAME')==None else "", os.getenv('MSC_PASSWORD') if not os.getenv('MSC_PASSWORD')==None else "",pw)
         else:
             inputs: UserInputs = get_user_inputs()
-            sync_sign_in_MSC(inputs.username, inputs.password)
+            sync_sign_in_MSC(inputs.username, inputs.password,pw)
     with open("MSCauthToken.json","r") as f:
         data =json.load(f)
-    with sync_playwright() as p:
-        browser =  p.chromium.launch(headless=False)
+    
+        browser = pw.chromium.launch(headless=False)
 
         context =   browser.new_context(
             storage_state="auth_for_MSC.json"
@@ -130,7 +129,8 @@ def checkingMSC(booking_num) -> Timestamp | None:
 
 if __name__ == "__main__":
     try:
-        print(checkingMSC("EBKG11248028"))
+        with sync_playwright() as p:
+            print(checkingMSC("EBKG11248028", p))
     except Exception:
         print("\n❌ An error occurred:\n")
         traceback.print_exc()
