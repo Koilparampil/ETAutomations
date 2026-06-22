@@ -22,7 +22,7 @@ Usage:
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
@@ -35,7 +35,7 @@ from VShip.customerLookUp import lookup_customer_notif
 from VShip.syncSignInVShipCRM import sign_in_vshipcrm
 from VShip.writeNotif import note_writing as write_notif_in_VShip
 from carrierTing.carriers import carrierIDthenETAcheck
-from tinkyWinky import get_user_inputs
+from tinkyWinky import get_user_inputs, get_user_inputs_authed as get_authed_inputs
 
 load_dotenv(override=True)
 
@@ -65,8 +65,23 @@ def get_data(filename):
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
-    ###Get File and User Creds from User.
-    inputs = get_user_inputs()
+    VSHIP_token_age = (datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime)) if Path('auth_for_VshipCRM.txt').exists() else None
+    MSC_token_age = (datetime.now() - datetime.fromtimestamp(Path('MSCauthToken.json').stat().st_mtime)) if Path('MSCauthToken.json').exists() else None
+    if ((VSHIP_token_age is not None) and (VSHIP_token_age < timedelta(hours=1))) and ((MSC_token_age is not None) and (MSC_token_age < timedelta(minutes=30))):
+        print("Using cached auth tokens for VShip and MSC.")
+        inputs =get_authed_inputs()
+    else:
+        ###Get File and User Creds from User.
+        inputs = get_user_inputs()
+        print("Fetching QuickBooks access token...")
+        token = get_access_token()
+        print("QuickBooks token obtained.")
+        print("Signing in to MSC...")
+        sync_sign_in_MSC_complete(inputs.MSC_username, inputs.MSC_password)
+        print("MSC sign-in complete.")
+        print("Signing in to VShip CRM...")
+        sign_in_vshipcrm(inputs.VSHIP_username, inputs.VSHIP_password)
+        print("VShip CRM sign-in complete.")
     # Extracting invoice numbers from file
     try:
         print("Extracting data from file...")
@@ -78,15 +93,6 @@ def main():
     if not invoice_numbers:
         sys.exit("Invoice list is empty - nothing to do.")
     print(f"Loaded {len(invoice_numbers)} booking(s) from file.")
-    print("Fetching QuickBooks access token...")
-    token = get_access_token()
-    print("QuickBooks token obtained.")
-    print("Signing in to MSC...")
-    sync_sign_in_MSC_complete(inputs.MSC_username, inputs.MSC_password)
-    print("MSC sign-in complete.")
-    print("Signing in to VShip CRM...")
-    sign_in_vshipcrm(inputs.VSHIP_username, inputs.VSHIP_password)
-    print("VShip CRM sign-in complete.")
     ok = failed = 0
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     is_first_run = not any(SESSION_DIR.iterdir())
