@@ -40,7 +40,9 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
             timeout=10,
             )
         resp.raise_for_status()
-        booking_id = resp.json().get("value").get("data")[0].get("bookingId")
+        booking_id_array = resp.json().get("value").get("data")
+        filtered = [booking for booking in booking_id_array if "copy" not in booking.get("bookingNo").lower()]
+        booking_id = filtered[0].get("bookingId")
         print(f"  [VShip] Found booking ID: {booking_id}")
     except (KeyError, IndexError, AttributeError) as e:
         print(f"Error parsing response JSON: {e}")
@@ -79,14 +81,29 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
     
 
 if __name__ == "__main__":
-    booking_no = "EBKG17422302"
+    booking_no = "EBKG16126251"
+    with open('auth_for_VshipCRM.txt', 'r') as f:
+        token = f.read().strip()
+    print(f"  [VShip] Searching for booking {booking_no}...")
     try:
-        result = lookup_customer_notif(booking_no)
-        if result is True:
-            print(f"Booking {booking_no} has a notif #1 but no notif #2.")
-        elif result == 2:
-            print(f"Booking {booking_no} has both notif #1 and notif #2.")
-        else:
-            print(f"Booking {booking_no} has no notif #1.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+        resp = requests.get(
+            f"https://vship2000-prod-api.azurewebsites.net/api/Bookings/searchBooking?searchText={booking_no}&page=1&pageSize=50",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+            },
+            timeout=10,
+            )
+        resp.raise_for_status()
+        booking_id_array = resp.json().get("value").get("data")
+        filtered = [booking for booking in booking_id_array if "copy" not in booking.get("bookingNo").lower()]
+        booking_id = filtered[0].get("bookingId")
+        print(f"  [VShip] Found booking ID: {booking_id}")
+    except (KeyError, IndexError, AttributeError) as e:
+        print(f"Error parsing response JSON: {e}")
+        raise json.JSONDecodeError(f"Unexpected JSON structure: {resp.text}", resp.text, 0)
+    except requests.RequestException as e:
+        print(f"HTTP request failed: {e}")
+        raise
+
+     

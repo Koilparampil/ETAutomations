@@ -70,6 +70,10 @@ def process_invoice(page: Page, eta_date: Timestamp, invoice_id: str, notif_num:
 
     print(f"  [QBO] Opening send dialog...")
     _click_button(page, "Review and send")
+    try:
+        page.locator("[data-testid=\"confirmation-modal-confirm\"]").click(timeout=2000)
+    except PWTimeout:
+        print("  [QBO] 'Yes' button not found — confirmation did not come up.")
     page.wait_for_load_state("load", timeout=15_000)
     page.wait_for_timeout(800)
 
@@ -111,6 +115,10 @@ def process_future_invoice(page, eta_date: Timestamp, invoice_id: str, bookNum:s
 
     print(f"  [QBO] Saving invoice (ETA outside send window)...")
     _click_button(page, "Save", "Save and close")
+    try:
+        page.locator("[data-testid=\"confirmation-modal-confirm\"]").click(timeout=2000)
+    except PWTimeout:
+        print("  [QBO] 'Yes' button not found — confirmation did not come up.")
     page.wait_for_load_state("load", timeout=15_000)
     page.wait_for_timeout(1_500)
     print(f"  [QBO] Saved — ETA={eta_date.date()}")
