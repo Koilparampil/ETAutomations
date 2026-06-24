@@ -29,7 +29,7 @@ def carrierIDthenETAcheck(booking_num:str, pw:Playwright) -> tuple[bool, pd.Time
             if eta_look_up is not None:
                 window_cutoff = add_business_days(pd.Timestamp.now(), 6)
                 in_window = eta_look_up <= window_cutoff
-                print(f"  [Carrier] ETA={eta_look_up.date()} | Cutoff={window_cutoff.date()} | InWindow={in_window}")
+                print(f"  [Carrier] ETA={eta_look_up.date()} | Window Cutoff={window_cutoff.date()} | InWindow={in_window}")
                 return (in_window, eta_look_up)
             else:
                 print(f"  [Carrier] MSC returned no ETA for {booking_num}")
@@ -40,7 +40,7 @@ def carrierIDthenETAcheck(booking_num:str, pw:Playwright) -> tuple[bool, pd.Time
             if eta_look_up is not None:
                 window_cutoff = add_business_days(pd.Timestamp.now(), 6)
                 in_window = eta_look_up <= window_cutoff
-                print(f"  [Carrier] ETA={eta_look_up.date()} | Cutoff={window_cutoff.date()} | InWindow={in_window}")
+                print(f"  [Carrier] ETA={eta_look_up.date()} | Window Cutoff={window_cutoff.date()} | InWindow={in_window}")
                 return (in_window, eta_look_up)
             else:
                 print(f"  [Carrier] Maersk returned no ETA for {booking_num}")

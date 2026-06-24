@@ -21,7 +21,7 @@ def normalize(s) -> str:
         .strip()
     )
 
-def note_writing_pt2(eta: pd.Timestamp, notifNum: int, booking_id: str, token: str, comment: str):
+def note_writing_pt2(booking_id: str, token: str, comment: str):
     try:
         resp_note = requests.post(
         f"https://vship2000-prod-api.azurewebsites.net/api/Bookings/{booking_id}/comments", 
@@ -66,7 +66,9 @@ def note_writing(eta: pd.Timestamp, notifNum: int, booking_no: str):
             timeout=10,
             )
         resp.raise_for_status()
-        booking_id =resp.json().get("value").get("data")[0].get("bookingId")
+        booking_id_array = resp.json().get("value").get("data")
+        filtered = [booking for booking in booking_id_array if "copy" not in booking.get("bookingNo","").lower()]
+        booking_id = filtered[0].get("bookingId","")
     except (KeyError, IndexError,AttributeError) as e:
         print(f"Error parsing response JSON: {e}")
         raise json.JSONDecodeError(f"Unexpected JSON structure: {resp.text}", resp.text, 0)
@@ -78,7 +80,7 @@ def note_writing(eta: pd.Timestamp, notifNum: int, booking_no: str):
     if eta < pd.Timestamp.now():
         comment = f"ARRIVED ON {eta.strftime('%m/%d')}. NOTIF #{notifNum+1}"
     else:
-        comment = f"ARRIVING ON {eta.strftime('%m/%d')}. NOTIF #{notifNum+1}"
+        comment = f"ARRIVING ON {eta.strftime('%m/%d')}."
     print(f"  [VShip] Posting note for booking {booking_no}: {comment!r}")
                 
                 
@@ -110,11 +112,12 @@ def note_writing(eta: pd.Timestamp, notifNum: int, booking_no: str):
             sign_in_vshipcrm(inputs.username, inputs.password)
             with open('auth_for_VshipCRM.txt', 'r') as f:
                 token = f.read().strip()
-            note_writing_pt2(eta, notifNum, booking_id, token, comment)
+            note_writing_pt2(booking_id, token, comment)
         elif resp_note.status_code in [400,401,403] and (datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime) <= timedelta(minutes = 3)):
             raise ValueError(f"Note creation failed with status code, no resign in: {resp_note.status_code}\n{resp_note.text}")
     except Exception as e:
-        raise NoteError(f"Error creating note: {e}")    
+        raise NoteError(f"Error creating note: {e}")
+    return booking_id
     
 
 if __name__ == "__main__":

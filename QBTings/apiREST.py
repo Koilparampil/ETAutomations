@@ -3,8 +3,7 @@ import sys
 import requests
 from datetime import datetime
 from pathlib import Path
-from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+from dotenv import set_key, load_dotenv
 
 load_dotenv(override=True)
 # ── Credentials ────────────────────────────────────────────────────────────────
@@ -33,6 +32,7 @@ def get_access_token() -> str:
     resp.raise_for_status()
     data = resp.json()
     if (new_rt := data.get("refresh_token")) and new_rt != REFRESH_TOKEN:
+        set_key(".env", "QB_REFRESH_TOKEN", new_rt)
         print("[QB] [warning] Refresh token rotated - update QB_REFRESH_TOKEN in .env")
     print("[QB] Access token obtained.")
     return data["access_token"]

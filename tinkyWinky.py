@@ -25,6 +25,9 @@ class UserInputs:
     MSC_username: str
     MSC_password: str
     
+@dataclass
+class UserInputsAuthed:
+    filename: str
 
 def get_user_inputs() -> UserInputs:
     root = tk.Tk()
@@ -123,6 +126,71 @@ def get_user_inputs() -> UserInputs:
 
     # Focus order
     user_entry.focus_set()
+
+    root.mainloop()
+
+    if result is None:
+        raise SystemExit("User cancelled.")
+    return result
+
+def get_user_inputs_authed() -> UserInputs:
+    root = tk.Tk()
+    root.title("ETA Tool Login")
+    root.resizable(False, False)
+    
+    result: UserInputsAuthed | None = None
+    
+    # --- Variables ---
+    filename_var = tk.StringVar()
+
+
+    # --- Callbacks ---
+    def browse_file():
+        path = filedialog.askopenfilename(
+            title="Select .txt file",
+            filetypes=[("Text Files", "*.txt")],
+        )
+        if path:
+            filename_var.set(path)
+
+    def submit():
+        nonlocal result
+        filename = filename_var.get().strip()
+        ok, reason = is_valid_txt_file(filename)
+        if not ok:
+            messagebox.showerror("Invalid file", reason)
+            return
+        if not Path(filename).exists():
+            messagebox.showerror("File not found", "The selected file does not exist.")
+            return
+
+        # Store on the root so we can read it after mainloop exits
+        result  = UserInputsAuthed(filename=filename)
+        root.destroy()
+
+    def cancel():
+        root.destroy()
+
+    # --- Layout ---
+    pad = {"padx": 10, "pady": 10}
+
+    tk.Label(root, text="FileName").grid(row=0, column=0, sticky="e", **pad) # type: ignore pyLint warning thing
+    file_entry = tk.Entry(root, textvariable=filename_var, width=42)
+    file_entry.grid(row=0, column=1, **pad)# type: ignore pyLint warning thing
+    tk.Button(root, text="Browse...", command=browse_file).grid(row=0, column=2, **pad)# type: ignore pyLint warning thing
+
+    btn_frame = tk.Frame(root)
+    btn_frame.grid(row=7, column=0, columnspan=3, pady=(8, 12))
+
+    tk.Button(btn_frame, text="Cancel", width=12, command=cancel).pack(side="left", padx=6)
+    tk.Button(btn_frame, text="Submit", width=12, command=submit).pack(side="left", padx=6)
+
+    # Enter submits, Esc cancels
+    root.bind("<Return>", lambda _e: submit())
+    root.bind("<Escape>", lambda _e: cancel())
+
+    # Focus order
+    file_entry.focus_set()
 
     root.mainloop()
 

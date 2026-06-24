@@ -1,28 +1,7 @@
-#!/usr/bin/env python3
-"""
-QBO Invoice ETA Updater - Browser Automation
----------------------------------------------
-The ETA field is a User Defined Custom Field (UDCF) that QBO's REST API v3
-cannot write to. This script drives the QBO web interface with Playwright
-to update ETA and send each invoice - exactly as a user would in a browser.
-
-Setup (one-time):
-    pip install playwright && playwright install chromium
-    pip install -r requirements.txt
-
-First run: opens a visible browser - log in to QBO manually once.
-           The session is saved to .qbo_browser_session/ for future runs.
-Subsequent runs: reuses the saved session (headed by default; set
-                 QB_HEADLESS=true in .env for silent/headless mode).
-
-Usage:
-    python update_eta_browser.py invoice_numbers.txt
-"""
-
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
@@ -31,18 +10,23 @@ from MSC.signInMSC import sync_sign_in_MSC_complete
 from QBTings.apiREST import get_access_token, get_invoice_by_number
 from QBTings.playWrightQB import _wait_for_qbo_app
 from QBTings.invoiceProcessing import process_future_invoice, process_invoice
+from VShip.booking_changes import VSHIP_PW_LOGIN_URL, make_vship_booking_changes
 from VShip.customerLookUp import lookup_customer_notif
 from VShip.syncSignInVShipCRM import sign_in_vshipcrm
 from VShip.writeNotif import note_writing as write_notif_in_VShip
 from carrierTing.carriers import carrierIDthenETAcheck
-from tinkyWinky import get_user_inputs
+from tinkyWinky import get_user_inputs, get_user_inputs_authed as get_authed_inputs
 
 load_dotenv(override=True)
 
 QBO_WEB     = "https://qbo.intuit.com"
 HEADLESS  = os.getenv("QB_HEADLESS", "false").lower() == "true"
 SESSION_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "QB-APITesting" / "qbo_browser_session"
-
+USERNAME = os.getenv('VSHIP_USER_NAME') if os.getenv('VSHIP_USER_NAME')!=None else ""
+PASSWORD = os.getenv('VSHIP_PASSWORD') if os.getenv('VSHIP_PASSWORD')!=None else ""
+MSC_USERNAME = os.getenv('MSC_USER_NAME') if os.getenv('MSC_USER_NAME')!=None else ""
+MSC_PASSWORD = os.getenv('MSC_PASSWORD') if os.getenv('MSC_PASSWORD')!=None else ""
+QB = os.getenv('QB') if os.getenv('QB')!=None else ""
 # ── Helper Functions ─────────────────────────────────────────────────────────────────
 def write2BFile(booking):
     with open("Send2Ben.txt", "a") as f:
@@ -65,8 +49,26 @@ def get_data(filename):
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
-    ###Get File and User Creds from User.
-    inputs = get_user_inputs()
+    VSHIP_token_age = (datetime.now() - datetime.fromtimestamp(Path('auth_for_VshipCRM.txt').stat().st_mtime)) if Path('auth_for_VshipCRM.txt').exists() else None
+    MSC_token_age = (datetime.now() - datetime.fromtimestamp(Path('MSCauthToken.json').stat().st_mtime)) if Path('MSCauthToken.json').exists() else None
+    if ((VSHIP_token_age is not None) and (VSHIP_token_age < timedelta(hours=1))) and ((MSC_token_age is not None) and (MSC_token_age < timedelta(minutes=30))):
+        print("Using cached auth tokens for VShip and MSC.")
+        inputs =get_authed_inputs()
+        print("Fetching QuickBooks access token...")
+        token = get_access_token()
+    else:
+        # ###Get File and User Creds from User.
+        # inputs = get_user_inputs()
+        inputs =get_authed_inputs()
+        print("Fetching QuickBooks access token...")
+        token = get_access_token()
+        print("QuickBooks token obtained.")
+        print("Signing in to MSC...")
+        sync_sign_in_MSC_complete(MSC_USERNAME, MSC_PASSWORD)
+        print("MSC sign-in complete.")
+        print("Signing in to VShip CRM...")
+        sign_in_vshipcrm(USERNAME, PASSWORD)
+        print("VShip CRM sign-in complete.")
     # Extracting invoice numbers from file
     try:
         print("Extracting data from file...")
@@ -78,15 +80,6 @@ def main():
     if not invoice_numbers:
         sys.exit("Invoice list is empty - nothing to do.")
     print(f"Loaded {len(invoice_numbers)} booking(s) from file.")
-    print("Fetching QuickBooks access token...")
-    token = get_access_token()
-    print("QuickBooks token obtained.")
-    print("Signing in to MSC...")
-    sync_sign_in_MSC_complete(inputs.MSC_username, inputs.MSC_password)
-    print("MSC sign-in complete.")
-    print("Signing in to VShip CRM...")
-    sign_in_vshipcrm(inputs.VSHIP_username, inputs.VSHIP_password)
-    print("VShip CRM sign-in complete.")
     ok = failed = 0
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     is_first_run = not any(SESSION_DIR.iterdir())
@@ -98,7 +91,20 @@ def main():
             viewport={"width": 1440, "height": 900},
         )
         page = context.new_page()
+        vship_page = context.new_page()
+        vship_page.goto(VSHIP_PW_LOGIN_URL)
+        vship_page.fill('input[name="emailId"]', USERNAME)
+        vship_page.fill('input[name="password"]', PASSWORD)
+        vship_page.click("button[type='submit']")
+        vship_page.wait_for_load_state("networkidle")
+        vship_page.context.set_default_timeout(10000)
+        print("Signed into VShipCRM")
         page.goto(QBO_WEB, wait_until="load")
+        try:
+            page.locator("button[data-testid='AccountChoiceButton_0']").click()
+            page.fill('input[name="Password"]', QB)
+        except Exception as e:
+            print(f"Error clicking AccountChoiceButton: {e}")
         _wait_for_qbo_app(page)
         print(f"\nStarting browser processing of {len(invoice_numbers)} booking(s)...\n")
         for bookingNum in invoice_numbers:
@@ -138,7 +144,8 @@ def main():
                             try:
                                 process_invoice(page, eta, inv['Id'], notif_num)
                                 try:
-                                    write_notif_in_VShip(eta,1 if notif_num else 0, bookingNum)
+                                    vship_booking_id = write_notif_in_VShip(eta,1 if notif_num else 0, bookingNum)
+                                    make_vship_booking_changes(vship_page, vship_booking_id, eta, bookingNum)
                                     print(f"  [OK]    #{bookingNum}\n")
                                     ok += 1                                    
                                 except Exception as exc:
@@ -161,7 +168,8 @@ def main():
                             try:
                                 process_future_invoice(page, eta, inv['Id'], bookingNum)
                                 try:
-                                    write_notif_in_VShip(eta, 0, bookingNum)
+                                    vship_booking_id = write_notif_in_VShip(eta, 0, bookingNum)
+                                    make_vship_booking_changes(vship_page, vship_booking_id, eta, bookingNum)
                                     print(f"  [OK]    #{bookingNum}\n")
                                     ok += 1                                    
                                 except Exception as exc:
@@ -199,7 +207,8 @@ def main():
                                 try:
                                     process_invoice(page, eta, inv['Id'], notif_num)
                                     try:
-                                        write_notif_in_VShip(eta, 1 if notif_num else 0, bookingNum[:-1])
+                                        vship_booking_id = write_notif_in_VShip(eta, 1 if notif_num else 0, bookingNum[:-1])
+                                        make_vship_booking_changes(vship_page, vship_booking_id, eta,bookingNum)
                                         print(f"  [OK]    #{bookingNum}\n")
                                         ok += 1                                    
                                     except Exception as exc:
@@ -222,7 +231,8 @@ def main():
                                 try:
                                     process_future_invoice(page, eta, inv['Id'], bookingNum)
                                     try:
-                                        write_notif_in_VShip(eta, 0, bookingNum)
+                                        vship_booking_id = write_notif_in_VShip(eta, 0, bookingNum)
+                                        make_vship_booking_changes(vship_page, vship_booking_id, eta, bookingNum)
                                         print(f"  [OK]    #{bookingNum}\n")
                                         ok += 1                                    
                                     except Exception as exc:

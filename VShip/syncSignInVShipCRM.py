@@ -20,4 +20,4 @@ def sign_in_vshipcrm(user, password):
 
 if __name__ == "__main__":
     print("Signing in to VShipCRM(new)")
-    sign_in_vshipcrm("user", "password")
+    sign_in_vshipcrm("", "")

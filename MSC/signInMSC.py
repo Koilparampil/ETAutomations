@@ -31,7 +31,7 @@ def pause_before_exit():
 
 def sync_sign_in_MSC(username, password, p:Playwright):
     
-    browser = p.chromium.launch(headless=False)
+    browser = p.chromium.launch(headless=True)
     context = browser.new_context()
     page = context.new_page()
 
@@ -51,7 +51,7 @@ def sync_sign_in_MSC(username, password, p:Playwright):
     # dispatches real keystrokes which trigger React state correctly.
     username_input = page.locator("#UserName")
     username_input.click()
-    username_input.press_sequentially(username, delay=50)
+    username_input.fill(username)
 
     page.evaluate("nextClicked()")
 
@@ -62,7 +62,7 @@ def sync_sign_in_MSC(username, password, p:Playwright):
 
     password_input = page.locator("#password")
     password_input.click()
-    password_input.press_sequentially(password, delay=50)
+    password_input.fill(password)
 
     page.click("button[type='submit']")
     try:
@@ -98,7 +98,7 @@ def sync_sign_in_MSC(username, password, p:Playwright):
 
 def sync_sign_in_MSC_complete(username, password):
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
 
@@ -118,7 +118,7 @@ def sync_sign_in_MSC_complete(username, password):
         # dispatches real keystrokes which trigger React state correctly.
         username_input = page.locator("#UserName")
         username_input.click()
-        username_input.press_sequentially(username, delay=50)
+        username_input.fill(username)
 
         page.evaluate("nextClicked()")
 
@@ -129,7 +129,7 @@ def sync_sign_in_MSC_complete(username, password):
 
         password_input = page.locator("#password")
         password_input.click()
-        password_input.press_sequentially(password, delay=50)
+        password_input.fill(password)
 
         page.click("button[type='submit']")
         try:
