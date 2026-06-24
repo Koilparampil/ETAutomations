@@ -8,6 +8,7 @@ from pandas.tseries.offsets import CustomBusinessDay
 from playwright.sync_api import Playwright, sync_playwright
 
 from MSC.checkETA import checkingMSC
+from Maersk.checkETA import checkingMaersk
 
 CARRIER_PATTERNS = [
     (r"EBKG\d{8}",        "MSC"),
@@ -34,7 +35,16 @@ def carrierIDthenETAcheck(booking_num:str, pw:Playwright) -> tuple[bool, pd.Time
                 print(f"  [Carrier] MSC returned no ETA for {booking_num}")
                 return (False, None)
         case b if re.fullmatch(r"2\d{8}", b):
-            raise RuntimeError(f"Maersk ETA lookup not yet implemented for booking {booking_num}")
+            print(f"  [Carrier] Identified as Maersk — querying tracking API...")
+            eta_look_up = checkingMaersk(booking_num, pw)
+            if eta_look_up is not None:
+                window_cutoff = add_business_days(pd.Timestamp.now(), 6)
+                in_window = eta_look_up <= window_cutoff
+                print(f"  [Carrier] ETA={eta_look_up.date()} | Cutoff={window_cutoff.date()} | InWindow={in_window}")
+                return (in_window, eta_look_up)
+            else:
+                print(f"  [Carrier] Maersk returned no ETA for {booking_num}")
+                return (False, None)
         case b if re.search(r"NAM\d{7}", b):
             raise RuntimeError(f"CMA ETA lookup not yet implemented for booking {booking_num}")
         case b if re.search(r"S3\d{8}", b):
