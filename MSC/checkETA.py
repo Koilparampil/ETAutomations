@@ -54,7 +54,7 @@ def checkingMSC(booking_num: str, pw: Playwright) -> Timestamp | None:
         data = json.load(f)
 
     print(f"  [MSC] Querying tracking API for booking {booking_num}...")
-    browser = pw.chromium.launch(headless=False)
+    browser = pw.chromium.launch(headless=True)
     context = browser.new_context(
         storage_state="auth_for_MSC.json"
     )
