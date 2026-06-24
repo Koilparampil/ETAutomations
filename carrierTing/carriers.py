@@ -49,6 +49,8 @@ def carrierIDthenETAcheck(booking_num:str, pw:Playwright) -> tuple[bool, pd.Time
             raise RuntimeError(f"CMA ETA lookup not yet implemented for booking {booking_num}")
         case b if re.search(r"S3\d{8}", b):
             raise RuntimeError(f"Grimaldi ETA lookup not yet implemented for booking {booking_num}")
+        case b if re.search(r"2026\d{6}", b):
+            raise RuntimeError(f"This is a Ref Number: {booking_num}")
         case _:
             raise RuntimeError(f"No carrier pattern matched booking {booking_num} — process manually")
 
