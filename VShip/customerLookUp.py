@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Tuple
 from datetime import datetime, timedelta
+import pandas as pd
 from playwright.async_api import async_playwright
 import playwright.async_api
 import os
@@ -15,7 +16,7 @@ from tinkyWinky_log_only import UserInputs, get_user_inputs
 
 VSHIP_LOGIN_URL = "https://vshipcrm.com/Home/Index"
 
-def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
+def lookup_customer_notif(booking_no: str) -> Tuple[bool | Literal[2] , bool]:
     if not booking_no:
         print("No booking number provided")
         raise ValueError("No booking number provided")
@@ -67,13 +68,16 @@ def lookup_customer_notif(booking_no: str) -> bool | Literal[2]:
         if matches:
             if any("notif #2" in comment.get("comment", "").lower() for comment in comments_all):
                 print(f"  [VShip] Notif result: both #1 and #2 found → 2")
-                return 2
+                return 2, False
             else:
                 print(f"  [VShip] Notif result: Notif #1 found, no #2 → True")
-                return True
+                if (pd.Timestamp.now() - pd.Timedelta(days=7)) < (pd.Timestamp(matches[0].get("createdDate", ""))):
+                    return True, False
+                else:
+                    return True, True
         else:
             print(f"  [VShip] Notif result: no Notif #1 found → False")
-            return False
+            return False, True
     except (KeyError, IndexError,AttributeError) as e:
         print(f"Error parsing response JSON while finding notifs: {e}")
         raise json.JSONDecodeError(f"Unexpected JSON structure for comments: {resp.text}", resp.text, 0)

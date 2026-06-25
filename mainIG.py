@@ -129,35 +129,41 @@ def main():
                 if inWindow and (eta is not None):
                     print(f"  Looking up VShip notifications for {bookingNum}...")
                     try:
-                        notif_num = lookup_customer_notif(bookingNum)
+                        notif_num, havetoDo = lookup_customer_notif(bookingNum)
                     except Exception as e:
                         print(f"  [WARN] Notif lookup failed: {e} — defaulting to False")
                         notif_num = False
+                        havetoDo = True
                     print(f"  Notif status: {notif_num}")
                     if notif_num == 2:
                         print(f"Booking {bookingNum} has both Notif #1 and Notif #2. Skipping invoice update and sending to Ben.")
                         write2BFile(bookingNum)
                         continue
                     else:
-                        inv = get_invoice_by_number(token, bookingNum)
-                        if inv is not None:
-                            try:
-                                process_invoice(page, eta, inv['Id'], notif_num)
+                        if havetoDo:
+                            inv = get_invoice_by_number(token, bookingNum)
+                            if inv is not None:
                                 try:
-                                    vship_booking_id = write_notif_in_VShip(eta,1 if notif_num else 0, bookingNum)
-                                    make_vship_booking_changes(vship_page, vship_booking_id, eta, bookingNum)
-                                    print(f"  [OK]    #{bookingNum}\n")
-                                    ok += 1                                    
+                                    process_invoice(page, eta, inv['Id'], notif_num)
+                                    try:
+                                        vship_booking_id = write_notif_in_VShip(eta,1 if notif_num else 0, bookingNum)
+                                        make_vship_booking_changes(vship_page, vship_booking_id, eta, bookingNum)
+                                        print(f"  [OK]    #{bookingNum}\n")
+                                        ok += 1                                    
+                                    except Exception as exc:
+                                        write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, Email Still Sent\n{exc}\n")
+                                        failed += 1
+                                        continue
                                 except Exception as exc:
-                                    write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, Email Still Sent\n{exc}\n")
+                                    write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                     failed += 1
                                     continue
-                            except Exception as exc:
-                                write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, No Email Sent\n{exc}\n")
+                            else:
+                                write2FileFail(f"[SKIP] #{bookingNum} - not found in QuickBooks")
                                 failed += 1
                                 continue
                         else:
-                            write2FileFail(f"[SKIP] #{bookingNum} - not found in QuickBooks")
+                            write2FileFail(f"[SKIP] #{bookingNum} - Done in the last week")
                             failed += 1
                             continue
                 else:
@@ -193,30 +199,36 @@ def main():
                     inWindow, eta = carrierIDthenETAcheck(bookingNum[:-1].strip(), pw)
                     if inWindow and (eta is not None):
                         try:
-                            notif_num = lookup_customer_notif(bookingNum[:-1])
+                            notif_num, havetoDo = lookup_customer_notif(bookingNum[:-1])
                         except Exception as e:
                             print(f"Error occurred while looking up customer notification for {bookingNum[:-1]}: {e}")
                             notif_num = False
+                            havetoDo = True
                         if notif_num == 2:
                             print(f"Booking {bookingNum} has both Notif #1 and Notif #2. Skipping invoice update and sending to Ben.")
                             write2BFile(bookingNum)
                             continue
                         else:
-                            inv = get_invoice_by_number(token, bookingNum)
-                            if inv is not None:
-                                try:
-                                    process_invoice(page, eta, inv['Id'], notif_num)
+                            if havetoDo:
+                                inv = get_invoice_by_number(token, bookingNum)
+                                if inv is not None:
                                     try:
-                                        vship_booking_id = write_notif_in_VShip(eta, 1 if notif_num else 0, bookingNum[:-1])
-                                        make_vship_booking_changes(vship_page, vship_booking_id, eta,bookingNum)
-                                        print(f"  [OK]    #{bookingNum}\n")
-                                        ok += 1                                    
+                                        process_invoice(page, eta, inv['Id'], notif_num)
+                                        try:
+                                            vship_booking_id = write_notif_in_VShip(eta, 1 if notif_num else 0, bookingNum[:-1])
+                                            make_vship_booking_changes(vship_page, vship_booking_id, eta,bookingNum)
+                                            print(f"  [OK]    #{bookingNum}\n")
+                                            ok += 1                                    
+                                        except Exception as exc:
+                                            write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, Email Still Sent\n{exc}\n")
+                                            failed += 1
+                                            continue
                                     except Exception as exc:
-                                        write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, Email Still Sent\n{exc}\n")
+                                        write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, No Email Sent\n{exc}\n")
                                         failed += 1
                                         continue
-                                except Exception as exc:
-                                    write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, No Email Sent\n{exc}\n")
+                                else:
+                                    write2FileFail(f"[SKIP] #{bookingNum} - not found in QuickBooks")
                                     failed += 1
                                     continue
                             else:
@@ -236,11 +248,11 @@ def main():
                                         print(f"  [OK]    #{bookingNum}\n")
                                         ok += 1                                    
                                     except Exception as exc:
-                                        write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, Email Still Sent\n{exc}\n")
+                                        write2FileFail(f"[ERROR] #{bookingNum} - Note Write Error, QB ETA Still Saved\n{exc}\n")
                                         failed += 1
                                         continue
                                 except Exception as exc:
-                                    write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, No Email Sent\n{exc}\n")
+                                    write2FileFail(f"[ERROR] #{bookingNum} - QB Invoice Processing Error, QB NOT Saved\n{exc}\n")
                                     failed += 1      
                                     continue                  
                         else:

@@ -19,7 +19,6 @@ REFRESH_TOKEN = os.environ["QB_REFRESH_TOKEN"]
 REALM_ID      = os.environ["QB_REALM_ID"]
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-EMAIL_SUBJECT = "Your Invoice Is Ready"  # ← change subject line here
 
 SANDBOX   = os.getenv("QB_SANDBOX", "false").lower() == "true"
 HEADLESS  = os.getenv("QB_HEADLESS", "false").lower() == "true"
