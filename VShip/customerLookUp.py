@@ -67,16 +67,18 @@ def lookup_customer_notif(booking_no: str) -> Tuple[bool | Literal[2] , bool]:
         matches = [comment for comment in comments_all if ("notif #1" in comment.get("comment", "").lower())]
         if matches:
             if any("notif #2" in comment.get("comment", "").lower() for comment in comments_all):
-                print(f"  [VShip] Notif result: both #1 and #2 found → 2")
+                print(f"  [VShip] Notif result: both #1 and #2 found → 2\n  [VShip] dont have to do")
                 return 2, False
             else:
                 print(f"  [VShip] Notif result: Notif #1 found, no #2 → True")
                 if (pd.Timestamp.now() - pd.Timedelta(days=7)) < (pd.Timestamp(matches[0].get("createdDate", ""))):
+                    print(f"  [VShip] Notif result: Notif #1 found, no #2 → True\n  [VShip] dont have to do ")
                     return True, False
                 else:
+                    print(f"  [VShip] Notif result: Notif #1 found, no #2 → True\n  [VShip] have to do")
                     return True, True
         else:
-            print(f"  [VShip] Notif result: no Notif #1 found → False")
+            print(f"  [VShip] Notif result: no Notif #1 found → False\n  [VShip] have to do")
             return False, True
     except (KeyError, IndexError,AttributeError) as e:
         print(f"Error parsing response JSON while finding notifs: {e}")
@@ -85,29 +87,7 @@ def lookup_customer_notif(booking_no: str) -> Tuple[bool | Literal[2] , bool]:
     
 
 if __name__ == "__main__":
-    booking_no = "EBKG16126251"
-    with open('auth_for_VshipCRM.txt', 'r') as f:
-        token = f.read().strip()
-    print(f"  [VShip] Searching for booking {booking_no}...")
-    try:
-        resp = requests.get(
-            f"https://vship2000-prod-api.azurewebsites.net/api/Bookings/searchBooking?searchText={booking_no}&page=1&pageSize=50",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/json",
-            },
-            timeout=10,
-            )
-        resp.raise_for_status()
-        booking_id_array = resp.json().get("value").get("data")
-        filtered = [booking for booking in booking_id_array if "copy" not in booking.get("bookingNo").lower()]
-        booking_id = filtered[0].get("bookingId")
-        print(f"  [VShip] Found booking ID: {booking_id}")
-    except (KeyError, IndexError, AttributeError) as e:
-        print(f"Error parsing response JSON: {e}")
-        raise json.JSONDecodeError(f"Unexpected JSON structure: {resp.text}", resp.text, 0)
-    except requests.RequestException as e:
-        print(f"HTTP request failed: {e}")
-        raise
+    booking_no = "EBKG54698731"
+    print(lookup_customer_notif(booking_no))
 
      
